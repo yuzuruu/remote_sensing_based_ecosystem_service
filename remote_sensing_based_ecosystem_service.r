@@ -3,7 +3,8 @@
 # 09th. October 2019 First launch
 # **th. ****** **** Correction
 #
-#
+# Entire codes will be synchronized on github.
+# https://github.com/yuzuruu/remote_sensing_based_ecosystem_service
 
 
 # ---- load.library ----
