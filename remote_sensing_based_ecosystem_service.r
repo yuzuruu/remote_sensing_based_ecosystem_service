@@ -148,12 +148,12 @@ map.osm.vnm.cm <-
                  model = "WGS84", 
                  transform = TRUE,
                  location = "bottomright",
-                 box.fill = c("grey30", "white"), 
+                 box.fill = c("grey30", "white"), # left and right
                  box.color = "white",
                  st.color = "white"
   ) +
   north(data = vnm.adm.cm, location = "topleft") # direction
-  
+
 # save the map
 ggsave("map.osm.vnm.cm.pdf" ,
        plot = map.osm.vnm.cm
