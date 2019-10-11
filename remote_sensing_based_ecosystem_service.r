@@ -9,6 +9,7 @@
 
 # ---- load.library ----
 library(rgdal)
+library(spatstat)
 library(ggspatial)
 library(ggsn)
 library(GGally)
@@ -104,6 +105,7 @@ ggsave("hh.2010.sub.density.pdf")
 vnm.adm.01 <- readRDS("gadm36_VNM_1_sf.rds")
 vnm.adm.02 <- readRDS("gadm36_VNM_2_sf.rds")
 vnm.adm.03 <- readRDS("gadm36_VNM_2_sf.rds")
+vnm.adm <- vnm.adm.02
 # Pick up data of Ca Mau province
 # Somehow it does not work.
 vnm.adm %>% dplyr::filter(NAME_1 == "Ca Mau")
@@ -297,5 +299,40 @@ pairs.by.district <-
 ggsave("pairs.by.district.pdf",
        plot = pairs.by.district
        )
+#
+# END ---
+
+
+
+# ---- point.pattern ----
+# Point pattern analysis
+# NOTE
+# This section is under coding. 
+#
+# https://qiita.com/ishiijunpei/items/4234d78eacf2e7e7b8ef
+# https://eburchfield.github.io/files/Point_pattern_LAB.html
+
+
+# pick up points' location
+hh.2010.sub.point <- 
+  hh.2010.sub %>% 
+  dplyr::select(lon, lat) 
+
+# transform the point data into ppp-format data
+hh.2010.sub.point.ppp <- 
+  ppp(hh.2010.sub.point$lon,
+      hh.2010.sub.point$lat,
+      c(hh.2010.sub.point$lon%>%min(),hh.2010.sub.point$lon%>%max()),
+      c(hh.2010.sub.point$lat%>%min(),hh.2010.sub.point$lat%>%max())
+      )
+
+# plot contour with density
+hh.2010.sub.point.ppp %>%
+  density() %>%
+  contour(add=T)
+# plot an envelop plot
+# The plot indicate degree of agglomeration of target points.
+hh.2010.sub.point.ppp%>%envelope(Lest,nism=999)%>%plot()
+
 #
 # END ---
