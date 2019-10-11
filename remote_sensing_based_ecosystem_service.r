@@ -11,6 +11,7 @@
 library(rgdal)
 library(ggspatial)
 library(ggsn)
+library(GGally)
 library(tidyverse)
 library(viridis)
 library(viridisLite)
@@ -286,6 +287,15 @@ ggsave("map.osm.vnm.cm.total.invest.pdf" ,
 #
 # END ---
 
-
-
-
+# ---- pair plot ----
+pairs.by.district <- 
+  hh.2010.sub %>%
+  dplyr::select(disct, total_area, total_inco, total_invest) %>% 
+  ggpairs(aes_string(colour = "disct")) +
+  theme_classic()
+# save the plot
+ggsave("pairs.by.district.pdf",
+       plot = pairs.by.district
+       )
+#
+# END ---
