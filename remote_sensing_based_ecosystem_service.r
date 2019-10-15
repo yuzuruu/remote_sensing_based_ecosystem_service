@@ -102,16 +102,20 @@ ggsave("hh.2010.sub.density.pdf")
 # https://gadm.org/download_country_v3.html
 #
 # read the sf file
-vnm.adm.01 <- readRDS("gadm36_VNM_1_sf.rds")
-vnm.adm.02 <- readRDS("gadm36_VNM_2_sf.rds")
-vnm.adm.03 <- readRDS("gadm36_VNM_2_sf.rds")
-vnm.adm <- vnm.adm.02
+vnm.adm.01 <- readRDS("gadm36_VNM_1_sf.rds") # province
+vnm.adm.02 <- readRDS("gadm36_VNM_2_sf.rds") # district
+vnm.adm.03 <- readRDS("gadm36_VNM_3_sf.rds") # commune
+vnm.adm <- vnm.adm.03
 # Pick up data of Ca Mau province
 # Somehow it does not work.
 vnm.adm %>% dplyr::filter(NAME_1 == "Ca Mau")
 # It works.
 vnm.adm.cm <- 
   vnm.adm %>% 
+  dplyr::filter(GID_1 == "VNM.13_1")
+# To overwrite boundaries of province
+vnm.adm.cm.02 <- 
+  vnm.adm.02 %>% 
   dplyr::filter(GID_1 == "VNM.13_1")
 
 # Draw a map of administrative boundaries and overwrap survey points
@@ -120,19 +124,31 @@ vnm.adm.cm <-
 # Referring to the following website, we are able to switch 
 # type of map.
 # https://wiki.openstreetmap.org/wiki/Tile_servers
+# To overwrite the boundaries of districts and ones of wards, please refer to the 
+# following website.
+# https://stackoverflow.com/questions/49497182/ggplot-create-a-border-overlay-on-top-of-map
 
 # ---- map.total.area ----
 # colouring by total area
 # total area
 map.osm.vnm.cm.total.area <- 
-  ggplot(vnm.adm.cm) + 
+ggplot(vnm.adm.cm) + 
   annotation_map_tile(zoomin = 0, # This argument is adjusted automatically even if we fix it. 
                       type = "https://a.tile.openstreetmap.org/${z}/${x}/${y}.png"
   ) + 
+  # draw boundaries of ward
   # adjust administrative boundaries' color, density, and lines' width.
-  geom_sf(alpha = 0.3, 
+  geom_sf(alpha = 0.5, 
           colour = "grey60", 
           size = 0.5
+          ) +
+  # overwrite boundaries of district
+  geom_sf(fill = "transparent", 
+          color = "gray60", 
+          size = 1, 
+          data = . %>% 
+            group_by(GID_2) %>% 
+            summarise()
           ) +
   # Adjust area
   xlim(104.6, 105.5) +
@@ -184,9 +200,17 @@ map.osm.vnm.cm.total.inco <-
                       type = "https://a.tile.openstreetmap.org/${z}/${x}/${y}.png"
   ) + 
   # adjust administrative boundaries' color, density, and lines' width.
-  geom_sf(alpha = 0.3, 
+  geom_sf(alpha = 0.5, 
           colour = "grey60", 
           size = 0.5
+  ) +
+  # overwrite boundaries of district
+  geom_sf(fill = "transparent", 
+          color = "gray60", 
+          size = 1, 
+          data = . %>% 
+            group_by(GID_2) %>% 
+            summarise()
   ) +
   # Adjust area
   xlim(104.6, 105.5) +
@@ -240,9 +264,17 @@ map.osm.vnm.cm.total.invest <-
                       type = "https://a.tile.openstreetmap.org/${z}/${x}/${y}.png"
   ) + 
   # adjust administrative boundaries' color, density, and lines' width.
-  geom_sf(alpha = 0.3, 
+  geom_sf(alpha = 0.5, 
           colour = "grey60", 
           size = 0.5
+  ) +
+  # overwrite boundaries of district
+  geom_sf(fill = "transparent", 
+          color = "gray60", 
+          size = 1, 
+          data = . %>% 
+            group_by(GID_2) %>% 
+            summarise()
   ) +
   # Adjust area
   xlim(104.6, 105.5) +
@@ -302,13 +334,12 @@ ggsave("pairs.by.district.pdf",
 #
 # END ---
 
-
-
 # ---- point.pattern ----
 # Point pattern analysis
-# NOTE
-# This section is under coding. 
-#
+# To confirm whether agglomeration exists or not.
+# If exist, we need to consider spatial effect
+# For the point pattern analysis the following sites
+# might help.
 # https://qiita.com/ishiijunpei/items/4234d78eacf2e7e7b8ef
 # https://eburchfield.github.io/files/Point_pattern_LAB.html
 
@@ -327,6 +358,9 @@ hh.2010.sub.point.ppp <-
       )
 
 # plot contour with density
+# The results indicates that there are three agglomerated areas.
+# It is likely that we need to consider spatial influence when
+# we build an inference model.
 hh.2010.sub.point.ppp %>%
   density() %>%
   contour(add=T)
@@ -336,3 +370,8 @@ hh.2010.sub.point.ppp%>%envelope(Lest,nism=999)%>%plot()
 
 #
 # END ---
+
+
+
+plot(st_geometry(nc_triangles),   col = viridisLite::viridis(nrow(nc_triangles)))
+
