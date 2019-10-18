@@ -362,11 +362,7 @@ hh.2010.sub.point.ppp <-
       c(hh.2010.sub.point$lon%>%min(),hh.2010.sub.point$lon%>%max()),
       c(hh.2010.sub.point$lat%>%min(),hh.2010.sub.point$lat%>%max())
       )
-
-
 st_(hh.2010.sub.point)
-
-
 plot(delaunay(hh.2010.sub.point.ppp))
 
 
