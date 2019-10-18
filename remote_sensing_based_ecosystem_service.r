@@ -8,8 +8,13 @@
 
 
 # ---- load.library ----
+# When a package has not been installed, install the packages,
+# please use a command below and install that.
+# install.packages()
 library(rgdal)
+library(deldir)
 library(spatstat)
+library(spdep)
 library(ggspatial)
 library(ggsn)
 library(GGally)
@@ -34,6 +39,7 @@ colnames(utm.xy) <- c("lon","lat")
 hh.2010 <- bind_cols(hh.2010, utm.xy)
 # select required values
 ## choose any of requisite values
+
 hh.2010.sub <- 
   hh.2010 %>% 
   dplyr::select(lon,
@@ -357,6 +363,13 @@ hh.2010.sub.point.ppp <-
       c(hh.2010.sub.point$lat%>%min(),hh.2010.sub.point$lat%>%max())
       )
 
+
+st_(hh.2010.sub.point)
+
+
+plot(delaunay(hh.2010.sub.point.ppp))
+
+
 # plot contour with density
 # The results indicates that there are three agglomerated areas.
 # It is likely that we need to consider spatial influence when
@@ -372,6 +385,115 @@ hh.2010.sub.point.ppp%>%envelope(Lest,nism=999)%>%plot()
 # END ---
 
 
+# # ---- barplot.mangrove ----
+# # This is supplement o
+# # read data
+mangrove.area <-
+  readxl::read_excel("../mangrove_area.xlsx")
+# 2D barplot
+# The 2D barplot is enough for our paper, I guess.
+# If you need the 3D barplot,
+barplot.mangrove.area <-
+  mangrove.area %>%  # assign data to ggplot2 object
+  ggplot(aes(x = Year, y = `mangrove_area (th.ha)`)) + # set a plot area
+  geom_bar(stat = "identity",
+           fill = "darkgreen" # fix bars' color.
+           ) +
+  labs(x = "Year", # change label (x axis)
+       y = "Area of mangrove (Unit: 1,000 ha)" # change label (y axis)
+       ) +
+  labs(caption = "Nguon: Tong cuc lam nghiep, 2014") + # add a caption
+  theme_economist_white() + # set a theme
+  # adjust preference of caption and axis labels
+  theme(plot.caption = element_text(size = 15,
+                                    family = "Times",
+                                    face = "italic"),
+        axis.text = element_text(size = 12)
+        )
+# # # save
+# # ggsave("barplot.mangrove.area.pdf", plot = barplot.mangrove.area)
 
-plot(st_geometry(nc_triangles),   col = viridisLite::viridis(nrow(nc_triangles)))
 
+# ---- Distance-based neibours ----
+# To make a model, we need to consider spatial pattern of observations.
+# Here, while applying spdep::dnearneigh function, 
+# we check whether points exists within a certain circle.
+# Namely, we donfirm whether some observations are exist or not.
+# References
+# https://stackoverflow.com/questions/48152269/make-a-spatialpointsdataframe-with-sf-the-fast-way
+# http://fusion0202.blog.jp/archives/602289.html
+# https://www.r-bloggers.com/plotting-spatial-neighbors-in-ggmap/
+
+# make a subset including longitude and latitude
+hh.2010.sub.latlon <- 
+  hh.2010.sub %>% 
+  dplyr::select(lon, lat)  
+# transform the selected data into sf-formatted data
+# with projection information
+# 
+hh.2010.sub.latlon.sf <- 
+  sf::st_as_sf(hh.2010.sub.latlon, 
+               coords = c("lon", "lat"),  
+               crs = "+proj=longlat +datum=WGS84 +no_defs"
+               ) 
+
+# compute list of neighbourhood based on distance
+# Unit of d1 and d2 is DEGREE. Distance between d1 and d2 differs depending on location.
+# The function compute the distance while referring to the degree-based location.
+# Eg.
+# d2 is 0.05, indicating 0.05 times degree between the point 
+# (Approx. 5.5km)
+# So the code below compute whether points exist within 5.5km-radius circle (11km in diameter).
+# Of course, we can ad
+hh.2010.sub.latlon.nb <- 
+  dnearneigh(hh.2010.sub.latlon.sf,
+             d1 =  0, # 
+             d2 = 0.05, # radius of checking circle is 0.05 (Approx. 5.5km) 
+             longlat = TRUE
+             )
+
+# transform the result  
+# Spatial analysis packages often do not accept tidyverse data.
+# This time, by transforming into normal one, we apply the
+# function below.
+hh.2010.sub.latlon.cent <- as.data.frame(hh.2010.sub.latlon)
+colnames(hh.2010.sub.latlon.cent) <- c("lon","lat")
+
+# a function to display list of positions of neighbourhood points
+nb_to_df <- function(nb, coords){
+  x <- coords[, 1]
+  y <- coords[, 2]
+  n <- length(nb)
+  
+  cardnb <- card(nb)
+  i <- rep(1:n, cardnb)
+  j <- unlist(nb)
+  return(data.frame(x=x[i], xend=x[j],
+                    y=y[i], yend=y[j]))
+}
+
+# obtain list of neighbourhood points
+hh.2010.sub.latlon.df <- 
+  nb_to_df(hh.2010.sub.latlon.nb, 
+           hh.2010.sub.latlon.cent
+           )
+
+# plot the map of total investment with neighbourhood pattern
+# Points' colors are based on amount of total investiment.
+# The map shows that neighbourhood relationship is defined in dense area.
+# In contrast, in sparse area, the relationships is not defined.
+# At least, the results indicate that we need to consider spatial autocorrelations.
+map.osm.vnm.cm.total.invest.nb <- 
+  map.osm.vnm.cm.total.invest + 
+  # Overwrap survey point using survey results
+  geom_segment(aes(x=x, xend=xend, y=y, yend=yend),
+               data=hh.2010.sub.latlon.df
+               )
+ 
+# save the map
+ggsave("map.osm.vnm.cm.total.invest.nb.pdf",
+       plot = map.osm.vnm.cm.total.invest.nb
+       )
+
+#
+# END ---
