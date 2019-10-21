@@ -483,6 +483,7 @@ map.osm.vnm.cm.total.invest.nb <-
   map.osm.vnm.cm.total.invest + 
   # Overwrap survey point using survey results
   geom_segment(aes(x=x, xend=xend, y=y, yend=yend),
+               size = 0.5, 
                data=hh.2010.sub.latlon.df
                )
  
@@ -492,4 +493,38 @@ ggsave("map.osm.vnm.cm.total.invest.nb.pdf",
        )
 
 #
+# END ---
+
+# ---- official.statistics.population
+# read data
+# The data includes population by gender between 1976 and 2015.
+# Data in subsequent period should be collected.
+camau.official <- readxl::read_excel("indicators_camau.xlsx",
+                                     sheet = "population"
+                                     )
+# reshape the data set
+camau.population <- 
+  camau.official %>% 
+  dplyr::mutate(population.total = as.numeric(population_total),
+         population.male = as.numeric(population_male),
+         population.female = as.numeric(population_female)
+         ) %>% 
+  dplyr::select(year, 
+                district, 
+                area, 
+                population.total, 
+                population.male, 
+                population.female
+                )
+# line plot
+# We'd explain separation of district.
+# some lines evidently changes dramatically.
+camau.population %>% 
+  dplyr::select(-area) %>% 
+  ggplot(aes(x = year, y = population.total, fill = district)) + 
+  geom_line() +
+  geom_point(shape = 23) +
+  theme_classic()
+
+# 
 # END ---
