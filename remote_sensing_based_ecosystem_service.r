@@ -582,6 +582,44 @@ barplot.cm.mangrove.aqua <-
   theme(
     legend.position = c(0.4, 0.8)
   )
+
+# Another option of barplot with points
+cm.mangrove.aqua.02 <- 
+  cm.mangrove.aqua.1983.2014 %>% 
+  dplyr::rename(year = Year,
+                Mangrove = `Mangrove_area(ha)`,
+                Aquaculture = `Aquaculture_area(ha)`
+  ) %>% 
+  dplyr::mutate(year = as.factor(year))
+
+# draw a barplot
+barplot.cm.mangrove.aqua.02 <- 
+  cm.mangrove.aqua.02 %>% 
+  ggplot(aes(x = year, # x axis 
+             y = Aquaculture
+  )
+  ) +
+  geom_bar(stat = "identity", 
+           position = "dodge", # adjust position of bars
+           colour = "grey60",
+           fill = "skyblue"
+  ) +
+  geom_point(data = cm.mangrove.aqua.02,
+             aes(x = year, y = Mangrove),
+             fill = "darkgreen", 
+             size = 3,
+             
+  ) +
+  labs(x = "Year", 
+       y = "Area (Unit: ha)", 
+       fill = "Land use type",
+       shape = 3
+  ) +
+  # set theme
+  theme_classic() +
+  theme(
+    legend.position = c(0.4, 0.8)
+  )
 #
 #
 ##--- END ---
