@@ -529,9 +529,53 @@ camau.population %>%
 # 
 # END ---
 
-
-
-
-
+# ---- barplot.aquaculture.mangrove.area ---- 
+# read data
+cm.mangrove.aqua.1983.2014 <- readxl::read_excel("../Mangrove_area/Camau_mangrove_aquaculture_area_1983_2014.xlsx")
+# reshape the data for convenience
+cm.mangrove.aqua <- 
+  cm.mangrove.aqua.1983.2014 %>% 
+  dplyr::rename(year = Year,
+                Mangrove = `Mangrove_area(ha)`,
+                Aquaculture = `Aquaculture_area(ha)`
+                ) %>% 
+  tidyr::gather(key = landuse.type,
+                value = ha, Mangrove, Aquaculture
+                ) %>% 
+  dplyr::mutate(year = as.factor(year))
+# draw a barplot
+barplot.cm.mangrove.aqua <- 
+  cm.mangrove.aqua %>% 
+  # set a plot area
+  ggplot(aes(x = year, # x axis 
+             y = ha,  # y axis
+             fill = landuse.type # factors to fill color
+             )
+         ) +
+  # set type of figure
+  # In this case, we draw a bar plot 
+  geom_bar(stat = "identity", 
+           position = "dodge", # adjust position of bars
+           colour = "grey60" 
+           ) +
+  # adjust color of bars by valuable
+  # In detail of colors' name, please refer to the following website.
+  # http://www.stat.columbia.edu/~tzheng/files/Rcolor.pdf
+  scale_fill_manual(values = c("skyblue",  # 1st. valuable (Aquaculture)
+                               "darkgreen" # 2nd. Valuable (Mangrove)
+                               )
+                    ) +
+  # change axes labels and legend title
+  labs(x = "Year", 
+       y = "Area (Unit: ha)", 
+       fill = "Land use type"
+       ) +
+  # set theme
+  theme_classic() +
+  theme(
+    legend.position = c(0.4, 0.8)
+  )
+#
+##--- END ---
 
 
