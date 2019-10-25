@@ -82,8 +82,8 @@ summary.hh.2010.sub <-
   )
 # print to confirm summary table content
 print(summary.hh.2010.sub, n = Inf)
-# save the table
-write.csv(summary.hh.2010.sub, "summary.hh.2010.sub.csv")
+# # save the table
+# write.csv(summary.hh.2010.sub, "summary.hh.2010.sub.csv")
 
 # wrapped histogram by district
 hh.2010.sub %>% 
@@ -91,8 +91,8 @@ hh.2010.sub %>%
   geom_histogram()+
   facet_wrap(~ disct) +
   theme_classic()
-# save the histogram
-ggsave("hh.2010.sub.hist.pdf")
+# # save the histogram
+# ggsave("hh.2010.sub.hist.pdf")
 
 # density plot by district
 hh.2010.sub %>% 
@@ -101,8 +101,8 @@ hh.2010.sub %>%
   scale_color_viridis_d(option = "viridis", aesthetics = "colour") +
   labs(x = "Total area", y = "Density", colour = "District", ) +
   theme_classic()
-# save the density plot
-ggsave("hh.2010.sub.density.pdf")
+# # save the density plot
+# ggsave("hh.2010.sub.density.pdf")
 #
 # END ---
 
@@ -197,10 +197,10 @@ ggplot(vnm.adm.cm) +
                  box.color = "white",
                  st.color = "white"
   ) 
-# save the map
-ggsave("map.osm.vnm.cm.total.area.pdf" ,
-       plot = map.osm.vnm.cm.total.area
-       )
+# # save the map
+# ggsave("map.osm.vnm.cm.total.area.pdf" ,
+#        plot = map.osm.vnm.cm.total.area
+#        )
 
 # ---- map.total.income ----
 # colouring by total income
@@ -259,10 +259,10 @@ map.osm.vnm.cm.total.inco <-
                  box.color = "white",
                  st.color = "white"
   ) 
-# save the map
-ggsave("map.osm.vnm.cm.total.inco.pdf" ,
-       plot = map.osm.vnm.cm.total.inco
-)
+# # save the map
+# ggsave("map.osm.vnm.cm.total.inco.pdf" ,
+#        plot = map.osm.vnm.cm.total.inco
+# )
 #
 # END ---
 
@@ -323,10 +323,10 @@ map.osm.vnm.cm.total.invest <-
                  box.color = "white",
                  st.color = "white"
   ) 
-# save the map
-ggsave("map.osm.vnm.cm.total.invest.pdf" ,
-       plot = map.osm.vnm.cm.total.invest
-)
+# # save the map
+# ggsave("map.osm.vnm.cm.total.invest.pdf" ,
+#        plot = map.osm.vnm.cm.total.invest
+# )
 
 #
 # END ---
@@ -337,10 +337,10 @@ pairs.by.district <-
   dplyr::select(disct, total_area, total_inco, total_invest) %>% 
   ggpairs(aes_string(colour = "disct")) +
   theme_classic()
-# save the plot
-ggsave("pairs.by.district.pdf",
-       plot = pairs.by.district
-       )
+# # save the plot
+# ggsave("pairs.by.district.pdf",
+#        plot = pairs.by.district
+#        )
 #
 # END ---
 
@@ -491,10 +491,10 @@ map.osm.vnm.cm.total.invest.nb <-
                data=hh.2010.sub.latlon.df
                )
  
-# save the map
-ggsave("map.osm.vnm.cm.total.invest.nb.pdf",
-       plot = map.osm.vnm.cm.total.invest.nb
-       )
+# # save the map
+# ggsave("map.osm.vnm.cm.total.invest.nb.pdf",
+#        plot = map.osm.vnm.cm.total.invest.nb
+#        )
 
 #
 # END ---
@@ -532,12 +532,3 @@ camau.population %>%
 
 # 
 # END ---
-###
-
-
-
-
-
-
-#mwekhew
-#ghkgherkgh
