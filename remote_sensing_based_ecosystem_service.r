@@ -534,8 +534,6 @@ camau.population %>%
 # END ---
 
 
-<<<<<<< yuzuru
-
 # ---- barplot.aquaculture.mangrove.area ---- 
 # read data
 cm.mangrove.aqua.1983.2014 <- readxl::read_excel("../Mangrove_area/Camau_mangrove_aquaculture_area_1983_2014.xlsx")
