@@ -7,6 +7,7 @@
 # https://github.com/yuzuruu/remote_sensing_based_ecosystem_service
 
 
+# foo
 # ---- load.library ----
 # When a package has not been installed, install the packages,
 # please use a command below and install that.
