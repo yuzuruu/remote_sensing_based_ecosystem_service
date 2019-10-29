@@ -625,3 +625,9 @@ barplot.cm.mangrove.aqua.02 <-
 ##--- END ---
 
 
+
+files <- list.files("../../IMG_DATA")
+sentinel_org <- ?stack(files)
+
+
+
