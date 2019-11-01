@@ -592,23 +592,38 @@ cm.mangrove.aqua.02 <-
   ) %>% 
   dplyr::mutate(year = as.factor(year))
 
-# draw a barplot
+# draw a barplot with line and poing
+# To connect the points with line, we need to
+# add "group = 1" at aesthetic argument.
+# In detail, please refer to the following page.
+# https://stackoverflow.com/questions/27082601/ggplot2-line-chart-gives-geom-path-each-group-consist-of-only-one-observation
 barplot.cm.mangrove.aqua.02 <- 
   cm.mangrove.aqua.02 %>% 
-  ggplot(aes(x = year, # x axis 
-             y = Aquaculture
-  )
-  ) +
-  geom_bar(stat = "identity", 
+  ggplot() +
+  geom_bar(aes(x = year, # x axis 
+               y = Aquaculture
+               ),
+           stat = "identity", 
            position = "dodge", # adjust position of bars
            colour = "grey60",
            fill = "skyblue"
   ) +
+  geom_line(aes(x = year, 
+                y = Mangrove, 
+                group = 1 #Here to connect the point with line
+                ),
+            stat = "identity", 
+            position = "identity",
+            size = 1
+  ) +
   geom_point(data = cm.mangrove.aqua.02,
-             aes(x = year, y = Mangrove),
+             aes(x = year, 
+                 y = Mangrove
+                 ),
+             stat = "identity", 
+             position = "identity",
              fill = "darkgreen", 
-             size = 3,
-             
+             size = 3
   ) +
   labs(x = "Year", 
        y = "Area (Unit: ha)", 
@@ -620,14 +635,16 @@ barplot.cm.mangrove.aqua.02 <-
   theme(
     legend.position = c(0.4, 0.8)
   )
+# confirm the result
+print(barplot.cm.mangrove.aqua.02)
+# # save the plot
+# # Please comment out when not in use.
+# ggsave("barplot.cm.mangrove.aqua.02.pdf",
+#        plot = barplot.cm.mangrove.aqua.02
+#        )
+
+
 #
 #
 ##--- END ---
-
-
-
-files <- list.files("../../IMG_DATA")
-sentinel_org <- ?stack(files)
-
-
 
