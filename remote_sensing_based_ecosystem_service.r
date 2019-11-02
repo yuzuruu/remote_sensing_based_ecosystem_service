@@ -156,10 +156,8 @@ ggplot(vnm.adm.cm) +
   geom_sf(fill = "transparent", 
           color = "gray60", 
           size = 1, 
-          data = . %>% 
-            group_by(GID_2) %>% 
-            summarise()
-          ) +
+          data = vnm.adm.cm.02
+  ) +
   # Adjust area
   xlim(104.6, 105.5) +
   ylim(8.5, 9.0) +
@@ -218,9 +216,7 @@ map.osm.vnm.cm.total.inco <-
   geom_sf(fill = "transparent", 
           color = "gray60", 
           size = 1, 
-          data = . %>% 
-            group_by(GID_2) %>% 
-            summarise()
+          data = vnm.adm.cm.02
   ) +
   # Adjust area
   xlim(104.6, 105.5) +
@@ -282,9 +278,7 @@ map.osm.vnm.cm.total.invest <-
   geom_sf(fill = "transparent", 
           color = "gray60", 
           size = 1, 
-          data = . %>% 
-            group_by(GID_2) %>% 
-            summarise()
+          data = vnm.adm.cm.02
   ) +
   # Adjust area
   xlim(104.6, 105.5) +
@@ -368,6 +362,18 @@ hh.2010.sub.point.ppp <-
       )
 st_(hh.2010.sub.point)
 plot(delaunay(hh.2010.sub.point.ppp))
+
+
+hh.2010.sub %>% 
+  ggplot(aes(x = lon, y = lat)) +
+  stat_density2d(aes(fill = ..density..),
+                 geom = "raster",
+                 contour = FALSE
+                 ) +
+  scale_fill_viridis(alpha = 0.5)
+
+
+
 
 
 # plot contour with density
@@ -489,8 +495,8 @@ map.osm.vnm.cm.total.invest.nb <-
   geom_segment(aes(x=x, xend=xend, y=y, yend=yend),
                size = 0.5, 
                data=hh.2010.sub.latlon.df
-               )
- 
+               ) 
+
 # # save the map
 # ggsave("map.osm.vnm.cm.total.invest.nb.pdf",
 #        plot = map.osm.vnm.cm.total.invest.nb
