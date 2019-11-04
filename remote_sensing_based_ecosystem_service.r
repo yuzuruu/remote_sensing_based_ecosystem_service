@@ -737,7 +737,11 @@ print(as.character(selected.id.02$id)) # 43 observations were found
 contradictional.id <- 
   dplyr::bind_rows(selected.id.01, selected.id.02) %>% 
   dplyr::arrange(id)
-
+# save observations including contradiction
+hh.2010.selected.contradiction <- 
+  hh.2010.selected %>% 
+  dplyr::filter(id %in% as.numeric(contradictional.id$id))
+write.csv(hh.2010.selected.contradiction, "hh.2010.selected.contradiction.csv")
 
 # omit samples excluding contradictional samples
 # If there would not be any problems, let us omit the
