@@ -6,11 +6,6 @@
 # Entire codes will be synchronized on github.
 # https://github.com/yuzuruu/remote_sensing_based_ecosystem_service
 
-
-
-
-
-# foo
 # ---- load.library ----
 # When a package has not been installed, install the packages,
 # please use a command below and install that.
@@ -156,10 +151,8 @@ ggplot(vnm.adm.cm) +
   geom_sf(fill = "transparent", 
           color = "gray60", 
           size = 1, 
-          data = . %>% 
-            group_by(GID_2) %>% 
-            summarise()
-          ) +
+          data = vnm.adm.cm.02
+  ) +
   # Adjust area
   xlim(104.6, 105.5) +
   ylim(8.5, 9.0) +
@@ -218,9 +211,7 @@ map.osm.vnm.cm.total.inco <-
   geom_sf(fill = "transparent", 
           color = "gray60", 
           size = 1, 
-          data = . %>% 
-            group_by(GID_2) %>% 
-            summarise()
+          data = vnm.adm.cm.02
   ) +
   # Adjust area
   xlim(104.6, 105.5) +
@@ -282,9 +273,7 @@ map.osm.vnm.cm.total.invest <-
   geom_sf(fill = "transparent", 
           color = "gray60", 
           size = 1, 
-          data = . %>% 
-            group_by(GID_2) %>% 
-            summarise()
+          data = vnm.adm.cm.02
   ) +
   # Adjust area
   xlim(104.6, 105.5) +
@@ -368,6 +357,18 @@ hh.2010.sub.point.ppp <-
       )
 st_(hh.2010.sub.point)
 plot(delaunay(hh.2010.sub.point.ppp))
+
+
+hh.2010.sub %>% 
+  ggplot(aes(x = lon, y = lat)) +
+  stat_density2d(aes(fill = ..density..),
+                 geom = "raster",
+                 contour = FALSE
+                 ) +
+  scale_fill_viridis(alpha = 0.5)
+
+
+
 
 
 # plot contour with density
@@ -489,8 +490,8 @@ map.osm.vnm.cm.total.invest.nb <-
   geom_segment(aes(x=x, xend=xend, y=y, yend=yend),
                size = 0.5, 
                data=hh.2010.sub.latlon.df
-               )
- 
+               ) 
+
 # # save the map
 # ggsave("map.osm.vnm.cm.total.invest.nb.pdf",
 #        plot = map.osm.vnm.cm.total.invest.nb
@@ -647,4 +648,104 @@ print(barplot.cm.mangrove.aqua.02)
 #
 #
 ##--- END ---
+
+##################################################################
+##################################################################
+##################################################################
+
+# selected data and consideration in detail
+# NOTE:
+# load required libraries in advance
+#
+# ---- read.selected.data ----
+# To transform datum, please refer to the following page.
+# https://stackoverflow.com/questions/30018098/how-to-convert-utm-coordinates-to-lat-and-long-in-r
+# read data
+hh.2010.selected <- 
+  readxl::read_excel("../Household_survey_data/household_survey_results_for_revision.xlsx",
+                     sheet = "survey.2010.selected",
+                     range = "A02:CS224",
+                     col_names = TRUE
+                     )
+# Transform the UTM into lonlat
+utm.xy.selected <- 
+  hh.2010.selected %>% 
+  dplyr::select(X, Y) %>% 
+  SpatialPoints(., proj4string=CRS("+proj=utm +zone=48 +datum=WGS84")) %>% 
+  spTransform(., CRS("+proj=longlat +datum=WGS84")) %>% 
+  as_tibble() %>% 
+  mutate(lon = X,
+         lat = Y
+         )
+# replace UTM location and the transformed location 
+hh.2010.selected <- 
+  hh.2010.selected %>% 
+  mutate(X = utm.xy.selected$lon,
+         Y = utm.xy.selected$lat
+           ) %>% 
+  rename(lon = X,
+         lat = Y
+         )
+#
+## --- END ---
+
+# ---- find.contradiction ----
+# find contradictional samples using condition match
+# Note
+# After finding some candidate of the contradictional samples,
+# we need to consider whether they match or not individually.
+# 1. Those who do not use mangroves and use for some purposes.
+# fuel
+selected.id.011 <- 
+  hh.2010.selected  %>%  
+  dplyr::filter(use_man == 2 & fuel != 0) %>% 
+  dplyr::select(id)
+print(as.character(selected.id.011$id))
+# construction
+selected.id.012 <- 
+  hh.2010.selected  %>%  
+  dplyr::filter(use_man == 2 & construction != 0) %>% 
+  dplyr::select(id)
+print(as.character(selected.id.012$id))
+# fishing
+selected.id.013 <- 
+  hh.2010.selected  %>%  
+  dplyr::filter(use_man == 2 & fishing != 0) %>% 
+  dplyr::select(id)
+print(as.character(selected.id.013$id))
+# resting
+selected.id.014 <- 
+  hh.2010.selected  %>%  
+  dplyr::filter(use_man == 2 & resting != 0) %>% 
+  dplyr::select(id)
+print(as.character(selected.id.014$id))
+# maching function (7 observations were found.)
+selected.id.01 <- 
+  union(selected.id.011, selected.id.012) %>% 
+  union(selected.id.013) %>% 
+  union(selected.id.014)
+# 2. Those who use mangroves and do not use for any purposes.
+selected.id.02 <- 
+  hh.2010.selected  %>%  
+  dplyr::filter(use_man == 1 & fuel == 0 & construction == 0 & fishing == 0 & resting == 0) %>% 
+  dplyr::select(id)
+print(as.character(selected.id.02$id)) # 43 observations were found
+# pick up ids of contradictional observation
+# Note
+# After finding some candidate of the contradictional samples,
+# we need to consider whether they match or not individually.
+contradictional.id <- 
+  dplyr::bind_rows(selected.id.01, selected.id.02) %>% 
+  dplyr::arrange(id)
+
+
+# omit samples excluding contradictional samples
+# If there would not be any problems, let us omit the
+# contradictional samples.
+hh.2010.selected.02 <- 
+  hh.2010.selected %>% 
+  dplyr::filter(!(id %in% as.numeric(contradictional.id$id)))
+
+#
+## --- END ---
 
