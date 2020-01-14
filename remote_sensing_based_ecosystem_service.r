@@ -1,7 +1,7 @@
 ############################################################
 # Ecosystem service estimation using remote sensing results
 # 09th. October 2019 First launch
-# **th. ****** **** Correction
+# 14th. January 2020 revision
 #
 # Entire codes will be synchronized on github.
 # https://github.com/yuzuruu/remote_sensing_based_ecosystem_service
@@ -14,8 +14,10 @@ library(rgdal)
 library(deldir)
 library(spatstat)
 library(spdep)
-library(ggspatial)
+library(ggmap)
 library(ggsn)
+library(ggrepel)
+library(ggspatial)
 library(GGally)
 library(tidyverse)
 library(viridis)
@@ -38,7 +40,6 @@ colnames(utm.xy) <- c("lon","lat")
 hh.2010 <- bind_cols(hh.2010, utm.xy)
 # select required values
 ## choose any of requisite values
-
 hh.2010.sub <- 
   hh.2010 %>% 
   dplyr::select(lon,
@@ -62,6 +63,9 @@ hh.2010.sub <-
   )
 #
 # END ---
+
+# To check data set in detail
+# write_csv(hh.2010.sub, "hh.2010.sub.csv")
 
 # ---- summary.statistics.and.histogram ----
 # Make a descriptive statistics
@@ -122,6 +126,14 @@ vnm.adm.cm <-
 vnm.adm.cm.02 <- 
   vnm.adm.02 %>% 
   dplyr::filter(GID_1 == "VNM.13_1")
+vnm.adm.cm.03 <- 
+  vnm.adm.03 %>% 
+  dplyr::filter(GID_1 == "VNM.13_1")
+
+
+vnm.adm.01 %>% 
+  dplyr::filter(GID_1 == "VNM.13_1") %>% 
+  sf::st_centroid()
 
 # Draw a map of administrative boundaries and overwrap survey points
 # We use OpenStreet map for base layer.
@@ -132,6 +144,79 @@ vnm.adm.cm.02 <-
 # To overwrite the boundaries of districts and ones of wards, please refer to the 
 # following website.
 # https://stackoverflow.com/questions/49497182/ggplot-create-a-border-overlay-on-top-of-map
+#
+# read Google API
+# change the API code as you obtain from Google
+source("../../r_project/map.key.r")
+# set centroid using latitude and longitude
+lat.center.camau <- c(8.75)
+lon.center.camau <- c(105.05)
+# Obtain satellite imagery
+map.sat.vnm.cm.total.area <- 
+  get_map(location = c(lon = lon.center.camau,
+                       lat = lat.center.camau
+  ), 
+  maptype = "satellite",
+  zoom = 10
+  ) %>% 
+  ggmap() +
+  geom_sf(data = vnm.adm.cm.03,
+          colour = "grey60",
+          fill = "white",
+          alpha = 0.05,
+          inherit.aes = FALSE
+          ) +
+    xlim(104.7, 105.5) +
+    ylim(8.55, 9) +
+  # Overwrap survey point using survey results
+  geom_point(
+    data = hh.2010.sub,
+    aes(x = lon, y = lat, fill = total_area),
+    colour = "grey28",
+    shape = 21,
+    size = 2.5
+    ) +
+    scale_fill_viridis_c(option = "viridis",
+                         begin = 1,
+                         end = 0
+    ) +
+    labs(x = "Longitude", 
+         y = "Latitude",
+         fill = "Total area (Unit: Ha)",
+         caption = "\U00a9 Google"
+    ) +
+    theme_minimal() +
+  theme(
+    legend.position = c(0.8,0.3),
+    legend.title = element_text(colour = "white"),
+    legend.text = element_text(colour = "white")
+  ) +
+    # adjust scalebar's preferences
+    ggsn::scalebar(x.min = 105.0,
+                   x.max = 105.4,
+                   y.min = 8.56,
+                   y.max = 8.60, 
+                   dist_unit = "km",
+                   dist = 20, 
+                   st.size = 4,
+                   st.dist = 0.25,
+                   height = 0.25,
+                   model = "WGS84", 
+                   transform = TRUE,
+                   location = "bottomright",
+                   box.fill = c("grey30", "white"), # left and right
+                   box.color = "white",
+                   st.color = "white"
+    ) 
+
+# save the plot
+# comment out when not in use
+ggsave("map.sat.vnm.cm.total.area.pdf",
+       plot = map.sat.vnm.cm.total.area
+       )
+
+#
+### --- END ---
 
 # ---- map.total.area ----
 # colouring by total area
@@ -680,8 +765,8 @@ utm.xy.selected <-
 # replace UTM location and the transformed location 
 hh.2010.selected <- 
   hh.2010.selected %>% 
-  mutate(X = utm.xy.selected$lon,
-         Y = utm.xy.selected$lat
+  mutate(lon = utm.xy.selected$lon,
+         lat = utm.xy.selected$lat
            ) %>% 
   rename(lon = X,
          lat = Y
@@ -689,67 +774,75 @@ hh.2010.selected <-
 #
 ## --- END ---
 
-# ---- find.contradiction ----
-# find contradictional samples using condition match
-# Note
-# After finding some candidate of the contradictional samples,
-# we need to consider whether they match or not individually.
-# 1. Those who do not use mangroves and use for some purposes.
-# fuel
-selected.id.011 <- 
-  hh.2010.selected  %>%  
-  dplyr::filter(use_man == 2 & fuel != 0) %>% 
-  dplyr::select(id)
-print(as.character(selected.id.011$id))
-# construction
-selected.id.012 <- 
-  hh.2010.selected  %>%  
-  dplyr::filter(use_man == 2 & construction != 0) %>% 
-  dplyr::select(id)
-print(as.character(selected.id.012$id))
-# fishing
-selected.id.013 <- 
-  hh.2010.selected  %>%  
-  dplyr::filter(use_man == 2 & fishing != 0) %>% 
-  dplyr::select(id)
-print(as.character(selected.id.013$id))
-# resting
-selected.id.014 <- 
-  hh.2010.selected  %>%  
-  dplyr::filter(use_man == 2 & resting != 0) %>% 
-  dplyr::select(id)
-print(as.character(selected.id.014$id))
-# maching function (7 observations were found.)
-selected.id.01 <- 
-  union(selected.id.011, selected.id.012) %>% 
-  union(selected.id.013) %>% 
-  union(selected.id.014)
-# 2. Those who use mangroves and do not use for any purposes.
-selected.id.02 <- 
-  hh.2010.selected  %>%  
-  dplyr::filter(use_man == 1 & fuel == 0 & construction == 0 & fishing == 0 & resting == 0) %>% 
-  dplyr::select(id)
-print(as.character(selected.id.02$id)) # 43 observations were found
-# pick up ids of contradictional observation
-# Note
-# After finding some candidate of the contradictional samples,
-# we need to consider whether they match or not individually.
-contradictional.id <- 
-  dplyr::bind_rows(selected.id.01, selected.id.02) %>% 
-  dplyr::arrange(id)
-# save observations including contradiction
-hh.2010.selected.contradiction <- 
-  hh.2010.selected %>% 
-  dplyr::filter(id %in% as.numeric(contradictional.id$id))
-write.csv(hh.2010.selected.contradiction, "hh.2010.selected.contradiction.csv")
+# # ---- find.contradiction ----
+# # NOTE on 5th. November 2019
+# # The selected data is not sceptical. The contradiction of
+# # answers results from limitation of interview survey.
+# # This time, we treat the data as "TRUE" data.
+# # For reference, I will leave the code.
+# # find contradictional samples using condition match
+# # Note
+# # After finding some candidate of the contradictional samples,
+# # we need to consider whether they match or not individually.
+# # 1. Those who do not use mangroves and use for some purposes.
+# # fuel
+# selected.id.011 <- 
+#   hh.2010.selected  %>%  
+#   dplyr::filter(use_man == 2 & fuel != 0) %>% 
+#   dplyr::select(id)
+# print(as.character(selected.id.011$id))
+# # construction
+# selected.id.012 <- 
+#   hh.2010.selected  %>%  
+#   dplyr::filter(use_man == 2 & construction != 0) %>% 
+#   dplyr::select(id)
+# print(as.character(selected.id.012$id))
+# # fishing
+# selected.id.013 <- 
+#   hh.2010.selected  %>%  
+#   dplyr::filter(use_man == 2 & fishing != 0) %>% 
+#   dplyr::select(id)
+# print(as.character(selected.id.013$id))
+# # resting
+# selected.id.014 <- 
+#   hh.2010.selected  %>%  
+#   dplyr::filter(use_man == 2 & resting != 0) %>% 
+#   dplyr::select(id)
+# print(as.character(selected.id.014$id))
+# # maching function (7 observations were found.)
+# selected.id.01 <- 
+#   union(selected.id.011, selected.id.012) %>% 
+#   union(selected.id.013) %>% 
+#   union(selected.id.014)
+# # 2. Those who use mangroves and do not use for any purposes.
+# selected.id.02 <- 
+#   hh.2010.selected  %>%  
+#   dplyr::filter(use_man == 1 & fuel == 0 & construction == 0 & fishing == 0 & resting == 0) %>% 
+#   dplyr::select(id)
+# print(as.character(selected.id.02$id)) # 43 observations were found
+# # pick up ids of contradictional observation
+# # Note
+# # After finding some candidate of the contradictional samples,
+# # we need to consider whether they match or not individually.
+# contradictional.id <- 
+#   dplyr::bind_rows(selected.id.01, selected.id.02) %>% 
+#   dplyr::arrange(id)
+# # save observations including contradiction
+# hh.2010.selected.contradiction <- 
+#   hh.2010.selected %>% 
+#   dplyr::filter(id %in% as.numeric(contradictional.id$id))
+# write.csv(hh.2010.selected.contradiction, "hh.2010.selected.contradiction.csv")
+# 
+# # omit samples excluding contradictional samples
+# # If there would not be any problems, let us omit the
+# # contradictional samples.
+# hh.2010.selected.02 <- 
+#   hh.2010.selected %>% 
+#   dplyr::filter(!(id %in% as.numeric(contradictional.id$id)))
+# 
+# #
+# ## --- END ---
 
-# omit samples excluding contradictional samples
-# If there would not be any problems, let us omit the
-# contradictional samples.
-hh.2010.selected.02 <- 
-  hh.2010.selected %>% 
-  dplyr::filter(!(id %in% as.numeric(contradictional.id$id)))
 
-#
-## --- END ---
-
+levels(as.factor(hh.2010.selected$village))
+  
