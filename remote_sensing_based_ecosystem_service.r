@@ -844,59 +844,36 @@ hh.2010.selected <-
 # ## --- END ---
 
 
-
-
-
-
-
-
-
-
-
+# ---- area.map ----
+# Make maps to detect farmers' / fishermen's using areas
+# By having them draw an area (circle, rectangle), we are able to 
+# obtain exact information on their land use.
 # read Google API
 # change the API code as you obtain from Google
 source("../../r_project/map.key.r")
-# set centroid using latitude and longitude
-lat.center.camau <- c(8.75)
-lon.center.camau <- c(105.05)
 
-# Obtain satellite imagery
-map.sat.vnm.cm.total.area <-
-  get_map(location = c(lon = lon.center.camau,
-                       lat = lat.center.camau
-  ), 
-  maptype = "satellite",
-  zoom = 16
-  ) %>% 
-  ggmap() +
-  labs(x = "Longitude", 
-       y = "Latitude",
-       fill = "Total area (Unit: Ha)",
-       caption = "\U00a9 Google"
-  ) +
-  theme_minimal()
-
-
-  
-  
-    
-    # # save the plot
-# # comment out when not in use
-# ggsave("map.sat.vnm.cm.total.area.pdf",
-#        plot = map.sat.vnm.cm.total.area
-# )
-
+# set common arguments
+# When we adjust settings of the map, adjust the following argument.
+# ---- set.common.arguments ----
+cellsize  <-  25 # size of cell (unit: meter (m))
+alpha  <-  0.1 # alpha channel (0.1 should be better.)
+zoom <-  17 # zooming 
+# location of target and their id
+lon.lat.id <- list(center.lon = hh.2010.sub$lon,
+                   center.lat = hh.2010.sub$lat,
+                   id = c(1:nrow(hh.2010.sub))
+)
 #
-### --- END ---
-
+## --- END ---
 
 # function to make a boundary box
 # Original code is below.
 # https://stackoverflow.com/questions/47749078/how-to-put-a-geom-sf-produced-map-on-top-of-a-ggmap-produced-raster
 # EPSG by google can be obtained from below.
 # https://colauttilab.github.io/EcologyTutorials/mapping.html
+# ---- ggmap.bbox.fun ----
 ggmap.bbox.fun <- function(sat.map) {
-  if (!inherits(map, "ggmap")) stop("map must be a ggmap object")
+  if (!inherits(sat.map, "ggmap")) stop("map must be a ggmap object")
   # Extract the bounding box (in lat/lon) from the ggmap to a numeric vector, 
   # and set the names to what sf::st_bbox expects:
   map_bbox <- setNames(unlist(attr(sat.map, 
@@ -926,59 +903,71 @@ ggmap.bbox.fun <- function(sat.map) {
   attr(sat.map, "bb")$ll.lon <- bbox.3857["xmin"]
   attr(sat.map, "bb")$ur.lat <- bbox.3857["ymax"]
   attr(sat.map, "bb")$ur.lon <- bbox.3857["xmax"]
-  map
+  sat.map
 }
-
-# set common arguments
-cellsize  <-  25 # size of cell (unit: meter (m))
-alpha  <-  0.1 # alpha channel
-zoom <-  17 # zooming 
-
+#
+## --- END ---
 
 # obtain a map from Google
 # Internet connection and Google API are necessary.
-sat.map <- 
-  get_map(location = c(lon = lon.center.camau,
-                       lat = lat.center.camau
+# ---- sat.grid.fun ----
+sat.grid.fun <- function(center.lon, center.lat, id){
+  sat.map <- 
+    get_map(location = c(lon = center.lon,
+                       lat = center.lat
                        ),
           maptype = "satellite",
           zoom = zoom
           ) 
-# make grids
-# 
-map.grid <- 
-  tibble::data_frame(
-    id = seq(1,2),
-    lon = as.numeric(unlist(attr(sat.map, which = "bb"))[c(2,4)]),
-    lat = as.numeric(unlist(attr(sat.map, which = "bb"))[c(1,3)])
-  ) %>% 
-  st_as_sf(coords = c("lon","lat"),
-           crs = 4326
-  ) %>% 
-  st_transform(crs = 3857) %>% 
-  st_bbox() %>% 
-  sf::st_make_grid(.,
-                   cellsize = cellsize # size of grid. Unit is metre (m)
-  ) 
-
-# make a ggplot-object map from the obtained map and
-# overlay the grid on the map
-ggmap.bbox.fun(sat.map) %>%
-  ggmap(sat.map) + 
-  coord_sf(crs = st_crs(3857)) + # force the ggplot2 map to be in 3857
-  geom_sf(data = map.grid, 
-          fill = "white", 
-          colour = "white",
-          alpha = alpha, 
-          inherit.aes = FALSE
-          ) +
-  labs(x = "Longitude",
-       y = "Latitude",
-       title = "No. of target",
-       subtitle = paste("Size of square is", cellsize,"m*", cellsize, "m")
-       ) +
-  theme_minimal()
+    # make grids
+    # 
+    # https://tsukubar.github.io/r-spatial-guide/simple-feature-for-r.html
+    map.grid <- 
+      tibble::data_frame(
+        id = seq(1,2),
+        lon = as.numeric(unlist(attr(sat.map, which = "bb"))[c(2,4)]),
+        lat = as.numeric(unlist(attr(sat.map, which = "bb"))[c(1,3)])
+      ) %>% 
+      st_as_sf(coords = c("lon","lat"),
+               crs = 4326
+      ) %>% 
+      st_transform(crs = 3857) %>% 
+      st_bbox() %>% 
+      sf::st_make_grid(.,
+                       cellsize = cellsize # size of grid. Unit is metre (m)
+      ) 
+    
+    # make a ggplot-object map from the obtained map and
+    # overlay the grid on the map
+    sat.map <- ggmap.bbox.fun(sat.map)
+    
+    ggmap(sat.map) + 
+      coord_sf(crs = st_crs(3857)) + # force the ggplot2 map to be in 3857
+      geom_sf(data = map.grid, 
+              fill = "white", 
+              colour = "white",
+              alpha = alpha, 
+              lwd = 0.01,
+              inherit.aes = FALSE
+              ) +
+      labs(x = "Longitude",
+           y = "Latitude",
+           title = id,
+           subtitle = paste("Size of square is", cellsize,"m*", cellsize, "m")
+           ) +
+      theme_minimal()
+    }
 #
 ## --- END ---
 
+# save the maps as a pdf file
+# comment out when not in use.
+# ---- target.landuse.map ----
+# pdf("target_landuse_survey_map.pdf")
+# lon.lat.id %>% 
+#   pmap(sat.grid.fun)
+# dev.off()
+#
+#
+## --- END ---
 
