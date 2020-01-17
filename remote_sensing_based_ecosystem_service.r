@@ -844,5 +844,141 @@ hh.2010.selected <-
 # ## --- END ---
 
 
-levels(as.factor(hh.2010.selected$village))
+
+
+
+
+
+
+
+
+
+# read Google API
+# change the API code as you obtain from Google
+source("../../r_project/map.key.r")
+# set centroid using latitude and longitude
+lat.center.camau <- c(8.75)
+lon.center.camau <- c(105.05)
+
+# Obtain satellite imagery
+map.sat.vnm.cm.total.area <-
+  get_map(location = c(lon = lon.center.camau,
+                       lat = lat.center.camau
+  ), 
+  maptype = "satellite",
+  zoom = 16
+  ) %>% 
+  ggmap() +
+  labs(x = "Longitude", 
+       y = "Latitude",
+       fill = "Total area (Unit: Ha)",
+       caption = "\U00a9 Google"
+  ) +
+  theme_minimal()
+
+
   
+  
+    
+    # # save the plot
+# # comment out when not in use
+# ggsave("map.sat.vnm.cm.total.area.pdf",
+#        plot = map.sat.vnm.cm.total.area
+# )
+
+#
+### --- END ---
+
+
+# function to make a boundary box
+# Original code is below.
+# https://stackoverflow.com/questions/47749078/how-to-put-a-geom-sf-produced-map-on-top-of-a-ggmap-produced-raster
+# EPSG by google can be obtained from below.
+# https://colauttilab.github.io/EcologyTutorials/mapping.html
+ggmap.bbox.fun <- function(sat.map) {
+  if (!inherits(map, "ggmap")) stop("map must be a ggmap object")
+  # Extract the bounding box (in lat/lon) from the ggmap to a numeric vector, 
+  # and set the names to what sf::st_bbox expects:
+  map_bbox <- setNames(unlist(attr(sat.map, 
+                                   "bb"
+                                   )
+                              ), 
+                       c("ymin", 
+                         "xmin", 
+                         "ymax", 
+                         "xmax"
+                         )
+                       )
+  # Coonvert the bbox to an sf polygon, transform it to 3857, 
+  # and convert back to a bbox (convoluted, but it works)
+  # st_as_sfc requires CRS. Google maps obtained from get_map() has no CRS info.
+  # We need to set the temporal CRS first. Then we transform the temporal CRS
+  # into real one (3857).
+  bbox.3857 <- 
+    map_bbox %>% 
+    st_bbox(crs = 4326) %>%
+    st_as_sfc %>% 
+    st_transform(crs = 3857) %>%
+    st_bbox()
+  # Overwrite the bbox of the ggmap object with the transformed coordinates 
+  # Names below can be obtained using str(map) function
+  attr(sat.map, "bb")$ll.lat <- bbox.3857["ymin"]
+  attr(sat.map, "bb")$ll.lon <- bbox.3857["xmin"]
+  attr(sat.map, "bb")$ur.lat <- bbox.3857["ymax"]
+  attr(sat.map, "bb")$ur.lon <- bbox.3857["xmax"]
+  map
+}
+
+# set common arguments
+cellsize  <-  25 # size of cell (unit: meter (m))
+alpha  <-  0.1 # alpha channel
+zoom <-  17 # zooming 
+
+
+# obtain a map from Google
+# Internet connection and Google API are necessary.
+sat.map <- 
+  get_map(location = c(lon = lon.center.camau,
+                       lat = lat.center.camau
+                       ),
+          maptype = "satellite",
+          zoom = zoom
+          ) 
+# make grids
+# 
+map.grid <- 
+  tibble::data_frame(
+    id = seq(1,2),
+    lon = as.numeric(unlist(attr(sat.map, which = "bb"))[c(2,4)]),
+    lat = as.numeric(unlist(attr(sat.map, which = "bb"))[c(1,3)])
+  ) %>% 
+  st_as_sf(coords = c("lon","lat"),
+           crs = 4326
+  ) %>% 
+  st_transform(crs = 3857) %>% 
+  st_bbox() %>% 
+  sf::st_make_grid(.,
+                   cellsize = cellsize # size of grid. Unit is metre (m)
+  ) 
+
+# make a ggplot-object map from the obtained map and
+# overlay the grid on the map
+ggmap.bbox.fun(sat.map) %>%
+  ggmap(sat.map) + 
+  coord_sf(crs = st_crs(3857)) + # force the ggplot2 map to be in 3857
+  geom_sf(data = map.grid, 
+          fill = "white", 
+          colour = "white",
+          alpha = alpha, 
+          inherit.aes = FALSE
+          ) +
+  labs(x = "Longitude",
+       y = "Latitude",
+       title = "No. of target",
+       subtitle = paste("Size of square is", cellsize,"m*", cellsize, "m")
+       ) +
+  theme_minimal()
+#
+## --- END ---
+
+
