@@ -111,6 +111,7 @@ hh.2010.sub %>%
 # https://gadm.org/download_country_v3.html
 #
 # read the sf file
+vnm.adm.00 <- readRDS("gadm36_VNM_0_sf.rds") # province
 vnm.adm.01 <- readRDS("gadm36_VNM_1_sf.rds") # province
 vnm.adm.02 <- readRDS("gadm36_VNM_2_sf.rds") # district
 vnm.adm.03 <- readRDS("gadm36_VNM_3_sf.rds") # commune
@@ -119,7 +120,7 @@ vnm.adm <- vnm.adm.03
 # Somehow it does not work.
 vnm.adm %>% dplyr::filter(NAME_1 == "Ca Mau")
 # It works.
-vnm.adm.cm <- 
+vnm.adm.cm.01 <- 
   vnm.adm %>% 
   dplyr::filter(GID_1 == "VNM.13_1")
 # To overwrite boundaries of province
@@ -844,130 +845,249 @@ hh.2010.selected <-
 # ## --- END ---
 
 
+
+# # WARNING
+# # THIS PROCESS NEEDS COMPUTATION PERIOD.
+# # COMMENT OUT WHEN NOT IN USE.
+# # Make maps to detect farmers' / fishermen's using areas
+# # By having them draw an area (circle, rectangle), we are able to 
+# # obtain exact information on their land use.
+# # read Google API
+# # change the API code as you obtain from Google
 # ---- area.map ----
-# Make maps to detect farmers' / fishermen's using areas
-# By having them draw an area (circle, rectangle), we are able to 
-# obtain exact information on their land use.
-# read Google API
-# change the API code as you obtain from Google
 source("../../r_project/map.key.r")
 
-# set common arguments
-# When we adjust settings of the map, adjust the following argument.
-# ---- set.common.arguments ----
-cellsize  <-  25 # size of cell (unit: meter (m))
-alpha  <-  0.1 # alpha channel (0.1 should be better.)
-zoom <-  17 # zooming 
-# location of target and their id
-lon.lat.id <- list(center.lon = hh.2010.sub$lon,
-                   center.lat = hh.2010.sub$lat,
-                   id = c(1:nrow(hh.2010.sub))
-)
+# # set common arguments
+# # When we adjust settings of the map, adjust the following argument.
+# # ---- set.common.arguments ----
+# cellsize  <-  25 # size of cell (unit: meter (m))
+# alpha  <-  0.1 # alpha channel (0.1 should be better.)
+# zoom <-  17 # zooming 
+# # location of target and their id
+# lon.lat.id <- list(center.lon = hh.2010.sub$lon,
+#                    center.lat = hh.2010.sub$lat,
+#                    id = c(1:nrow(hh.2010.sub))
+# )
+# #
+# ## --- END ---
+# 
+# # function to make a boundary box
+# # Original code is below.
+# # https://stackoverflow.com/questions/47749078/how-to-put-a-geom-sf-produced-map-on-top-of-a-ggmap-produced-raster
+# # EPSG by google can be obtained from below.
+# # https://colauttilab.github.io/EcologyTutorials/mapping.html
+# # ---- ggmap.bbox.fun ----
+# ggmap.bbox.fun <- function(sat.map) {
+#   if (!inherits(sat.map, "ggmap")) stop("map must be a ggmap object")
+#   # Extract the bounding box (in lat/lon) from the ggmap to a numeric vector, 
+#   # and set the names to what sf::st_bbox expects:
+#   map_bbox <- setNames(unlist(attr(sat.map, 
+#                                    "bb"
+#                                    )
+#                               ), 
+#                        c("ymin", 
+#                          "xmin", 
+#                          "ymax", 
+#                          "xmax"
+#                          )
+#                        )
+#   # Coonvert the bbox to an sf polygon, transform it to 3857, 
+#   # and convert back to a bbox (convoluted, but it works)
+#   # st_as_sfc requires CRS. Google maps obtained from get_map() has no CRS info.
+#   # We need to set the temporal CRS first. Then we transform the temporal CRS
+#   # into real one (3857).
+#   bbox.3857 <- 
+#     map_bbox %>% 
+#     st_bbox(crs = 4326) %>%
+#     st_as_sfc %>% 
+#     st_transform(crs = 3857) %>%
+#     st_bbox()
+#   # Overwrite the bbox of the ggmap object with the transformed coordinates 
+#   # Names below can be obtained using str(map) function
+#   attr(sat.map, "bb")$ll.lat <- bbox.3857["ymin"]
+#   attr(sat.map, "bb")$ll.lon <- bbox.3857["xmin"]
+#   attr(sat.map, "bb")$ur.lat <- bbox.3857["ymax"]
+#   attr(sat.map, "bb")$ur.lon <- bbox.3857["xmax"]
+#   sat.map
+# }
+# #
+# ## --- END ---
+# 
+# # obtain a map from Google
+# # Internet connection and Google API are necessary.
+# # ---- sat.grid.fun ----
+# sat.grid.fun <- function(center.lon, center.lat, id){
+#   sat.map <- 
+#     get_map(location = c(lon = center.lon,
+#                        lat = center.lat
+#                        ),
+#           maptype = "satellite",
+#           zoom = zoom
+#           ) 
+#     # make grids
+#     # 
+#     # https://tsukubar.github.io/r-spatial-guide/simple-feature-for-r.html
+#     map.grid <- 
+#       tibble::data_frame(
+#         id = seq(1,2),
+#         lon = as.numeric(unlist(attr(sat.map, which = "bb"))[c(2,4)]),
+#         lat = as.numeric(unlist(attr(sat.map, which = "bb"))[c(1,3)])
+#       ) %>% 
+#       st_as_sf(coords = c("lon","lat"),
+#                crs = 4326
+#       ) %>% 
+#       st_transform(crs = 3857) %>% 
+#       st_bbox() %>% 
+#       sf::st_make_grid(.,
+#                        cellsize = cellsize # size of grid. Unit is metre (m)
+#       ) 
+#     
+#     # make a ggplot-object map from the obtained map and
+#     # overlay the grid on the map
+#     sat.map <- ggmap.bbox.fun(sat.map)
+#     
+#     ggmap(sat.map) + 
+#       coord_sf(crs = st_crs(3857)) + # force the ggplot2 map to be in 3857
+#       geom_sf(data = map.grid, 
+#               fill = "white", 
+#               colour = "white",
+#               alpha = alpha, 
+#               lwd = 0.01,
+#               inherit.aes = FALSE
+#               ) +
+#       labs(x = "Longitude",
+#            y = "Latitude",
+#            title = id,
+#            subtitle = paste("Size of square is", cellsize,"m*", cellsize, "m")
+#            ) +
+#       theme_minimal()
+#     }
+# #
+# ## --- END ---
+# 
+# # save the maps as a pdf file
+# # comment out when not in use.
+# # ---- target.landuse.map ----
+# # pdf("target_landuse_survey_map.pdf")
+# # lon.lat.id %>%
+# #   pmap(sat.grid.fun)
+# # dev.off()
+# #
+# #
+# ## --- END ---
+# 
+
+
+# Ca Mau province map by commune / ward
+# ---- read.sf.data ----
+# province
+vnm.adm.cm.01 <- 
+  vnm.adm.01 %>% 
+  dplyr::filter(GID_1 == "VNM.13_1")
+# To overwrite boundaries of province
+vnm.adm.cm.02 <- 
+  vnm.adm.02 %>% 
+  dplyr::filter(GID_1 == "VNM.13_1")
+vnm.adm.cm.03 <- 
+  vnm.adm.03 %>% 
+  dplyr::filter(GID_1 == "VNM.13_1") %>% 
+  mutate(centroid = map(.$geometry, st_centroid))
 #
 ## --- END ---
 
-# function to make a boundary box
-# Original code is below.
-# https://stackoverflow.com/questions/47749078/how-to-put-a-geom-sf-produced-map-on-top-of-a-ggmap-produced-raster
-# EPSG by google can be obtained from below.
-# https://colauttilab.github.io/EcologyTutorials/mapping.html
-# ---- ggmap.bbox.fun ----
-ggmap.bbox.fun <- function(sat.map) {
-  if (!inherits(sat.map, "ggmap")) stop("map must be a ggmap object")
-  # Extract the bounding box (in lat/lon) from the ggmap to a numeric vector, 
-  # and set the names to what sf::st_bbox expects:
-  map_bbox <- setNames(unlist(attr(sat.map, 
-                                   "bb"
-                                   )
-                              ), 
-                       c("ymin", 
-                         "xmin", 
-                         "ymax", 
-                         "xmax"
-                         )
-                       )
-  # Coonvert the bbox to an sf polygon, transform it to 3857, 
-  # and convert back to a bbox (convoluted, but it works)
-  # st_as_sfc requires CRS. Google maps obtained from get_map() has no CRS info.
-  # We need to set the temporal CRS first. Then we transform the temporal CRS
-  # into real one (3857).
-  bbox.3857 <- 
-    map_bbox %>% 
-    st_bbox(crs = 4326) %>%
-    st_as_sfc %>% 
-    st_transform(crs = 3857) %>%
-    st_bbox()
-  # Overwrite the bbox of the ggmap object with the transformed coordinates 
-  # Names below can be obtained using str(map) function
-  attr(sat.map, "bb")$ll.lat <- bbox.3857["ymin"]
-  attr(sat.map, "bb")$ll.lon <- bbox.3857["xmin"]
-  attr(sat.map, "bb")$ur.lat <- bbox.3857["ymax"]
-  attr(sat.map, "bb")$ur.lon <- bbox.3857["xmax"]
-  sat.map
-}
-#
-## --- END ---
 
-# obtain a map from Google
-# Internet connection and Google API are necessary.
-# ---- sat.grid.fun ----
-sat.grid.fun <- function(center.lon, center.lat, id){
-  sat.map <- 
-    get_map(location = c(lon = center.lon,
-                       lat = center.lat
+# ---- compute.centroid.by.commune ----
+# How to use do.call(), refer to the following webpage.
+# http://www.okadajp.org/RWiki/?%E3%83%AA%E3%82%B9%E3%83%88Tips%E5%A4%A7%E5%85%A8#kd290b33
+# make a function to do that at a time
+# Warning
+# To avoid malfunction to use tidyverse(), we make the function
+# by base() package.
+st_centroid.fun <- function(geometry, VARNAME_3){
+    sf::st_centroid(geometry) %>% # compute centroid
+    base::do.call("rbind", .) %>% 
+    base::cbind(., VARNAME_3) %>% 
+    base::data.frame()
+  }
+# compute centroid
+vnm.adm.cm.03.centroid <- 
+  st_centroid.fun(vnm.adm.cm.03$geometry, 
+                  vnm.adm.cm.03$VARNAME_3
+                  )
+# rename the data containing centroid
+colnames(vnm.adm.cm.03.centroid) <- 
+  c("lon",
+    "lat",
+    "VARNAME_3"
+    )
+# convert data type
+vnm.adm.cm.03.centroid <- 
+  vnm.adm.cm.03.centroid %>% 
+  as_tibble() %>% 
+  mutate(lon = as.numeric(as.character(lon)),
+         lat = as.numeric(as.character(lat))
+         )
+# merge the centroid data and original sf data
+vnm.adm.cm.03 <-left_join(vnm.adm.cm.03, vnm.adm.cm.03.centroid, by = "VARNAME_3")
+# compute the centroid of Ca Mau province to download google satellite imagery
+camau.center <- 
+  st_centroid(vnm.adm.cm.01) %>% 
+  unlist() %>% 
+  data.frame() %>% 
+  setNames("geometry")
+cm.center.lon <- as.numeric(as.character(camau.center$geometry[11]))
+cm.center.lat <- as.numeric(as.character(camau.center$geometry[12]))
+# #
+# ## --- END ---
+
+# ---- map.sat.cm.by.commune ----
+# download satellite image
+sat.map.cm <-
+  get_map(location = c(lon = cm.center.lon,
+                       lat = cm.center.lat
                        ),
           maptype = "satellite",
-          zoom = zoom
-          ) 
-    # make grids
-    # 
-    # https://tsukubar.github.io/r-spatial-guide/simple-feature-for-r.html
-    map.grid <- 
-      tibble::data_frame(
-        id = seq(1,2),
-        lon = as.numeric(unlist(attr(sat.map, which = "bb"))[c(2,4)]),
-        lat = as.numeric(unlist(attr(sat.map, which = "bb"))[c(1,3)])
-      ) %>% 
-      st_as_sf(coords = c("lon","lat"),
-               crs = 4326
-      ) %>% 
-      st_transform(crs = 3857) %>% 
-      st_bbox() %>% 
-      sf::st_make_grid(.,
-                       cellsize = cellsize # size of grid. Unit is metre (m)
-      ) 
-    
-    # make a ggplot-object map from the obtained map and
-    # overlay the grid on the map
-    sat.map <- ggmap.bbox.fun(sat.map)
-    
-    ggmap(sat.map) + 
-      coord_sf(crs = st_crs(3857)) + # force the ggplot2 map to be in 3857
-      geom_sf(data = map.grid, 
-              fill = "white", 
-              colour = "white",
-              alpha = alpha, 
-              lwd = 0.01,
-              inherit.aes = FALSE
-              ) +
-      labs(x = "Longitude",
-           y = "Latitude",
-           title = id,
-           subtitle = paste("Size of square is", cellsize,"m*", cellsize, "m")
-           ) +
-      theme_minimal()
-    }
-#
-## --- END ---
+          zoom = 9
+          )
+# add communes' boundaries and names to the satellite imagery
+map.sat.cm.commune.name <- 
+  ggmap(sat.map.cm) +
+  coord_sf(crs = st_crs(3857)) +
+  geom_sf(data = vnm.adm.cm.03,
+          color = "white", 
+          fill = "transparent", 
+          size=0.125,
+          inherit.aes = FALSE
+          ) +
+  geom_text_repel(data = vnm.adm.cm.03, 
+                  label = vnm.adm.cm.03$VARNAME_3,
+                  color = "white",
+                  size = 1.5,
+                  na.rm = TRUE
+                  ) +
+  labs(x = "Longitude", y = "Latitude") +
+  xlim(104.7, 105.7) +
+  ylim(8.55, 9.55) +
+  ggsn::scalebar(x.min = 105.4,
+                 x.max = 105.60,
+                 y.min = 8.60,
+                 y.max = 8.65, 
+                 dist_unit = "km",
+                 dist = 20, 
+                 st.size = 4,
+                 st.dist = 0.25,
+                 height = 0.25,
+                 model = "WGS84", 
+                 transform = TRUE,
+                 location = "bottomright",
+                 box.fill = c("grey30", "white"), # left and right
+                 box.color = "white",
+                 st.color = "white"
+  ) 
+# save the map
+ggsave("map.sat.cm.commune.name.pdf", 
+       plot = map.sat.cm.commune.name
+       )
 
-# save the maps as a pdf file
-# comment out when not in use.
-# ---- target.landuse.map ----
-# pdf("target_landuse_survey_map.pdf")
-# lon.lat.id %>% 
-#   pmap(sat.grid.fun)
-# dev.off()
-#
-#
-## --- END ---
-
+# #
+# ## --- END ---
