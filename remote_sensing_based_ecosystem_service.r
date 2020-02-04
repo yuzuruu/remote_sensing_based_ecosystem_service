@@ -24,6 +24,33 @@ library(viridis)
 library(viridisLite)
 
 # ---- read.data ----
+# ---- map.data ----
+# To download sf file, please refer to the following website.
+# The sf file is much lighter than .shp and suitable for R.
+# https://gadm.org/download_country_v3.html
+#
+# read the sf file
+vnm.adm.00 <- readRDS("gadm36_VNM_0_sf.rds") # province
+vnm.adm.01 <- readRDS("gadm36_VNM_1_sf.rds") # province
+vnm.adm.02 <- readRDS("gadm36_VNM_2_sf.rds") # district
+vnm.adm.03 <- readRDS("gadm36_VNM_3_sf.rds") # commune
+vnm.adm <- vnm.adm.03
+# Pick up data of Ca Mau province
+# Somehow it does not work.
+vnm.adm %>% dplyr::filter(NAME_1 == "Ca Mau")
+# It works.
+vnm.adm.cm.01 <- 
+  vnm.adm %>% 
+  dplyr::filter(GID_1 == "VNM.13_1")
+# To overwrite boundaries of province
+vnm.adm.cm.02 <- 
+  vnm.adm.02 %>% 
+  dplyr::filter(GID_1 == "VNM.13_1")
+vnm.adm.cm.03 <- 
+  vnm.adm.03 %>% 
+  dplyr::filter(GID_1 == "VNM.13_1")
+
+# read household survey data
 # To transform datum, please refer to the following page.
 # https://stackoverflow.com/questions/30018098/how-to-convert-utm-coordinates-to-lat-and-long-in-r
 # read data
@@ -48,12 +75,11 @@ hh.2010.sub <-
                 age,
                 sex,
                 edu_le,
-                village,
-                disct,
                 prov,
                 total_area,
                 total_inco,
-                total_invest
+                total_invest,
+                check.status
   ) %>% 
   # Omit observations containing NAs
   na.omit() %>% 
@@ -61,6 +87,42 @@ hh.2010.sub <-
   dplyr::mutate(sex = factor(sex, levels = c(1,2)),
                 edu_le = factor(edu_le, levels = c(1,2,3,5,6))
   )
+# pick up target district including target communes
+# evaluate how many target samples exist in the commues each
+# consider sampling / survey procedure
+find.district.fun <- 
+  function(lon, lat){
+    id.location <- sf::st_contains(vnm.adm.cm.02,
+                                   st_point(c(lon,
+                                              lat
+                                   )
+                                   ),
+                                   sparse = FALSE
+    ) %>% 
+      grep(TRUE, .)  
+    vnm.adm.cm.02$VARNAME_2[id.location]
+  }
+
+find.commune.fun <- 
+  function(lon, lat){
+    id.location <- sf::st_contains(vnm.adm.cm.03,
+                                   st_point(c(lon,
+                                              lat
+                                   )
+                                   ),
+                                   sparse = FALSE
+    ) %>% 
+      grep(TRUE, .)  
+    vnm.adm.cm.03$VARNAME_3[id.location]
+  }
+# add names of district and commune from sf() files
+hh.2010.sub <- 
+  hh.2010.sub %>% 
+  mutate(., 
+         district = map2(.$lon, .$lat, find.district.fun),
+         commune = map2(.$lon, .$lat, find.commune.fun)
+  ) %>% 
+  unnest(cols = c("district", "commune"))
 #
 # END ---
 
@@ -105,37 +167,8 @@ hh.2010.sub %>%
 #
 # END ---
 
-# ---- map.data ----
-# To download sf file, please refer to the following website.
-# The sf file is much lighter than .shp and suitable for R.
-# https://gadm.org/download_country_v3.html
-#
-# read the sf file
-vnm.adm.00 <- readRDS("gadm36_VNM_0_sf.rds") # province
-vnm.adm.01 <- readRDS("gadm36_VNM_1_sf.rds") # province
-vnm.adm.02 <- readRDS("gadm36_VNM_2_sf.rds") # district
-vnm.adm.03 <- readRDS("gadm36_VNM_3_sf.rds") # commune
-vnm.adm <- vnm.adm.03
-# Pick up data of Ca Mau province
-# Somehow it does not work.
-vnm.adm %>% dplyr::filter(NAME_1 == "Ca Mau")
-# It works.
-vnm.adm.cm.01 <- 
-  vnm.adm %>% 
-  dplyr::filter(GID_1 == "VNM.13_1")
-# To overwrite boundaries of province
-vnm.adm.cm.02 <- 
-  vnm.adm.02 %>% 
-  dplyr::filter(GID_1 == "VNM.13_1")
-vnm.adm.cm.03 <- 
-  vnm.adm.03 %>% 
-  dplyr::filter(GID_1 == "VNM.13_1")
 
-
-vnm.adm.01 %>% 
-  dplyr::filter(GID_1 == "VNM.13_1") %>% 
-  sf::st_centroid()
-
+# ---- map.camau ----
 # Draw a map of administrative boundaries and overwrap survey points
 # We use OpenStreet map for base layer.
 # We can use google map. It, however, requires API when we use that many times.
@@ -1091,3 +1124,70 @@ ggsave("map.sat.cm.commune.name.pdf",
 
 # #
 # ## --- END ---
+
+# pick up target district including target communes
+# evaluate how many target samples exist in the commues each
+# consider sampling / survey procedure
+# When 5 observations should be collected from each commune,
+# n. will be as follows:
+# n. of observed in 2010 and still exist (available to be panel data): 53
+# n. of observed in 2010 and NOT exist (so should be added to): 22
+# n. of NOT observed in 2010 and to be observed: 40
+# 115 in total
+# Note
+# 6 per commune: 148
+# 7 per commune: 153
+# 8 per commune: 192
+
+# ---- n.of.target ----
+communes.observed.2010 <- 
+  hh.2010.sub %>% 
+  dplyr::filter(district %in% c("Phu Tan",
+                                "Nam Can",
+                                "Ngoc Hien")) %>% 
+  dplyr::filter(check.status == 1) %>% 
+  dplyr::group_by(district, commune) %>% 
+  dplyr::summarize_at(vars(check.status), funs(length))
+communes.to.be.observed <- 
+  vnm.adm.cm.03 %>% 
+  st_drop_geometry() %>% 
+  dplyr::filter(GID_2 %in% c("VNM.13.6_1", # Phu Tan
+                             "VNM.13.5_1", # Ngok Hien
+                             "VNM.13.4_1" # Nam Can
+                             )
+                ) %>% 
+  dplyr::filter(VARNAME_3 %in% setdiff(levels(factor(.$VARNAME_3)), 
+                                       n.obs.by.district.commune$commune)
+                ) %>% 
+  dplyr::select(NAME_2,VARNAME_3) %>% 
+  mutate(check.status = 0) %>% 
+  dplyr::rename(district = NAME_2,
+                commune = VARNAME_3,
+                check.status = check.status
+                ) %>% 
+  as_tibble()
+communes.target <- 
+  bind_rows(communes.observed.2010, 
+            communes.to.be.observed
+            ) %>% 
+  mutate(additional.observation = 8-check.status) %>% 
+  mutate_at(vars(additional.observation), 
+            funs(ifelse(additional.observation<0,
+                        0,
+                        .
+                        )
+                 )
+            ) 
+# readr::write_csv(communes.target, "communes.target.csv")
+
+
+# sampling procedure
+# separate target communes by 1 km square
+# pick up a certain number of sample areas randomly
+# (To be continued)
+
+
+# #
+# ## --- END ---
+
+
