@@ -14,6 +14,7 @@ library(rgdal)
 library(deldir)
 library(spatstat)
 library(spdep)
+library(ggimage)
 library(ggmap)
 library(ggsn)
 library(ggrepel)
@@ -1020,7 +1021,8 @@ vnm.adm.cm.01 <-
 # To overwrite boundaries of province
 vnm.adm.cm.02 <- 
   vnm.adm.02 %>% 
-  dplyr::filter(GID_1 == "VNM.13_1")
+  dplyr::filter(GID_1 == "VNM.13_1") %>% 
+  mutate(centroid = map(.$geometry, st_centroid))
 vnm.adm.cm.03 <- 
   vnm.adm.03 %>% 
   dplyr::filter(GID_1 == "VNM.13_1") %>% 
@@ -1083,15 +1085,21 @@ sat.map.cm <-
           zoom = 9
           )
 # add communes' boundaries and names to the satellite imagery
-map.sat.cm.commune.name <- 
+map.sat.cm.commune.name.whole <- 
   ggmap(sat.map.cm) +
   coord_sf(crs = st_crs(3857)) +
   geom_sf(data = vnm.adm.cm.03,
-          color = "white", 
-          fill = "transparent", 
+          color = "white",
+          fill = "transparent",
           size=0.125,
           inherit.aes = FALSE
-          ) +
+  ) +
+  geom_sf(data = vnm.adm.cm.02,
+          color = "white", 
+          fill = "transparent", 
+          size=1,
+          inherit.aes = FALSE
+  ) +
   geom_text_repel(data = vnm.adm.cm.03, 
                   label = vnm.adm.cm.03$VARNAME_3,
                   color = "white",
@@ -1107,7 +1115,7 @@ map.sat.cm.commune.name <-
                  y.max = 8.65, 
                  dist_unit = "km",
                  dist = 20, 
-                 st.size = 4,
+                 st.size = 3,
                  st.dist = 0.25,
                  height = 0.25,
                  model = "WGS84", 
@@ -1118,10 +1126,9 @@ map.sat.cm.commune.name <-
                  st.color = "white"
   ) 
 # save the map
-ggsave("map.sat.cm.commune.name.pdf", 
-       plot = map.sat.cm.commune.name
+ggsave("map.sat.cm.commune.name.whole.pdf", 
+       plot = map.sat.cm.commune.name.whole
        )
-
 # #
 # ## --- END ---
 
@@ -1157,7 +1164,7 @@ communes.to.be.observed <-
                              )
                 ) %>% 
   dplyr::filter(VARNAME_3 %in% setdiff(levels(factor(.$VARNAME_3)), 
-                                       n.obs.by.district.commune$commune)
+                                       communes.observed.2010$commune)
                 ) %>% 
   dplyr::select(NAME_2,VARNAME_3) %>% 
   mutate(check.status = 0) %>% 
@@ -1178,16 +1185,349 @@ communes.target <-
                         )
                  )
             ) 
-# readr::write_csv(communes.target, "communes.target.csv")
-
-
-# sampling procedure
-# separate target communes by 1 km square
-# pick up a certain number of sample areas randomly
-# (To be continued)
-
-
 # #
 # ## --- END ---
 
+
+# Map of target communes with maps of Vietnam and
+# Ca Mau province
+#
+# ---- map.sat.cm.target.district.commune ----
+
+# obtain a centroid of the 3 communes
+# The centroid is for obtaining Google satellite imagery.
+# and names of commune.
+# sf() added centroids by commune
+vnm.adm.cm.03.three.communes <- 
+  vnm.adm.cm.03 %>% 
+  dplyr::filter(GID_2 %in% c("VNM.13.6_1", # Phu Tan
+                             "VNM.13.5_1", # Ngok Hien
+                             "VNM.13.4_1" # Nam Can
+  )
+  ) 
+# sf() added centroids by district
+vnm.adm.cm.02.three.communes <- 
+  vnm.adm.cm.02 %>% 
+  dplyr::filter(GID_2 %in% c("VNM.13.6_1", # Phu Tan
+                             "VNM.13.5_1", # Ngok Hien
+                             "VNM.13.4_1" # Nam Can
+  )
+  ) 
+# centroid of Ca Mau province
+cm.center.three.communes <- 
+  vnm.adm.cm.03 %>% 
+  dplyr::filter(GID_2 %in% c("VNM.13.6_1", # Phu Tan
+                             "VNM.13.5_1", # Ngok Hien
+                             "VNM.13.4_1" # Nam Can
+  )
+  ) %>%
+  sf::st_union() %>% 
+  sf::st_centroid() %>% 
+  base::do.call("rbind", .) %>% 
+  base::data.frame()
+colnames(cm.center.three.communes) <- c("lon", "lat")
+
+# Data obtained in 2020 belonging to the three communes
+hh.2010.sub.three.communes<-
+  hh.2010.sub %>% 
+  dplyr::filter(district %in% c("Nam Can","Ngoc Hien","Phu Tan"))
+
+# obtain a satellite imagery from Google maps
+sat.map.cm.three.communes <-
+  get_map(location = c(lon = cm.center.three.communes$lon,
+                       lat = cm.center.three.communes$lat
+  ),
+  maptype = "satellite",
+  zoom = 10
+  )
+# map with target communes on satellite imagery
+map.sat.cm.commune.name.three.communes <- 
+  ggmap(sat.map.cm.three.communes) +
+  coord_sf(crs = st_crs(3857)) +
+  geom_sf(data = vnm.adm.cm.03.three.communes,
+          color = "white",
+          fill = "transparent",
+          size=0.125,
+          inherit.aes = FALSE
+  ) +
+  geom_sf(data = vnm.adm.cm.02.three.communes,
+          color = "white",
+          fill = "transparent",
+          size=1,
+          inherit.aes = FALSE
+  ) +
+  geom_point(data = hh.2010.sub.three.communes,
+             aes(x = lon, 
+                 y = lat,colour = as.factor(check.status)
+                 )
+             ) +
+  # We do not display points unavailable to perform survey
+  # Because of development and other reasons, we skip the 
+  # targets obtained in 2010
+  scale_colour_manual(values = 
+                        c("transparent",
+                          "yellow" # points collected in 2010 and existing in 2020
+                          )
+                      ) +
+  # communes' names
+  geom_text_repel(data = vnm.adm.cm.03.three.communes, 
+                  label = vnm.adm.cm.03.three.communes$VARNAME_3,
+                  color = "white",
+                  size = 2,
+                  na.rm = TRUE
+  ) +
+  labs(x = "Longitude", y = "Latitude") +
+  xlim(104.7, 105.30) +
+  ylim(8.55, 9.15) +
+  theme(
+    legend.position = "none"
+  ) +
+  ggsn::scalebar(x.min = 105.2,
+                 x.max = 105.3,
+                 y.min = 8.57,
+                 y.max = 8.60, 
+                 dist_unit = "km",
+                 dist = 10, 
+                 st.size = 3,
+                 st.dist = 0.3,
+                 height = 0.25,
+                 model = "WGS84", 
+                 transform = TRUE,
+                 location = "bottomright",
+                 box.fill = c("grey30", "white"), # left and right
+                 box.color = "white",
+                 st.color = "white"
+  ) 
+
+# ---- map.whole.republic ----
+map.whole.republic <- 
+  ggplot(vnm.adm.00) +
+  geom_sf(fill = "white") +
+  # Ha Noi
+  geom_point(aes(x = 105.80, # Ha Noi
+                 y = 21.0,
+  ),
+  size = 5
+  ) +
+  annotate("text", 
+           x = 105.80, 
+           y = 21.5, 
+           label = "Ha Noi"
+           ) +
+  # HCMC
+  geom_point(aes(x = 106.50, # HCMC
+                 y = 10.80
+  ),
+  size = 5
+  ) +
+  annotate("text", 
+           x = 104.80, 
+           y = 11.2, 
+           label = "Ho Chi Minh City"
+           ) +
+  # Ca Mau
+  geom_point(aes(x = 105.14, # Ca Mau
+                 y = 9.18
+  ),
+  size = 5
+  ) +
+  annotate("text", 
+           x = 106.2, 
+           y = 9.18, 
+           label = "Ca Mau"
+           ) +
+  # Vietnam
+  annotate("text", 
+           x = 105.00, 
+           y = 15.5, 
+           label = "Vietnam", 
+           size = 10) +
+  theme_void()
+
+# ---- map.camau.by.district ----
+# compute centroid by district
+vnm.adm.cm.02.centroid <- 
+  vnm.adm.cm.02 %>% 
+  st_centroid()
+vnm.adm.cm.02.centroid <- 
+  do.call("rbind",vnm.adm.cm.02.centroid$geometry)
+colnames(vnm.adm.cm.02.centroid) <- c("lon","lat")
+# combine the centroid with sf() file
+vnm.adm.cm.02<- 
+  cbind(vnm.adm.cm.02, 
+        vnm.adm.cm.02.centroid
+        )
+# plot a white map of Ca Mau province
+map.cm.district <- 
+  ggplot(vnm.adm.cm.02) + 
+  geom_sf(fill = "transparent", colour = "white") +
+  geom_text_repel(data = vnm.adm.cm.02, 
+                  aes(x = lon, y = lat),
+                  label = vnm.adm.cm.02$VARNAME_2,
+                  color = "white",
+                  size = 2,
+                  na.rm = TRUE
+  ) +
+  theme_void()
+
+# ---- map.whole.republic ----
+map.whole.republic <- 
+  ggplot(vnm.adm.00) +
+  geom_sf(fill = "transparent", colour = "white") +
+  # Ha Noi
+  # point
+  geom_point(aes(x = 105.80, # Ha Noi
+                 y = 21.0,
+  ),
+  size = 3,
+  colour = "white"
+  ) +
+  # text
+  annotate("text", 
+           x = 108.10, 
+           y = 21.0, 
+           label = "Ha Noi", 
+           colour = "white", 
+           size = 2.5
+           ) +
+  # HCMC
+  # point
+  geom_point(aes(x = 106.50, # HCMC
+                 y = 11.00
+  ),
+  size = 3,
+  colour = "white"
+  ) +
+  # text
+  annotate("text", 
+           x = 108.00, 
+           y = 12.0, 
+           label = "Ho Chi Minh City", 
+           colour = "white", 
+           size = 2.5
+           ) +
+  # Ca Mau
+  # point
+  geom_point(aes(x = 105.14, # Ca Mau
+                 y = 9.18
+  ),
+  size = 3,
+  colour = "white"
+  ) +
+  # text
+  annotate("text", 
+           x = 107.85, 
+           y = 9.18, 
+           label = "Ca Mau", 
+           colour = "white", 
+           size = 2.5
+           ) +
+  theme_void()
+
+# ---- map.camau.by.district ----
+# compute centroid by district
+vnm.adm.cm.02.centroid <- 
+  vnm.adm.cm.02 %>% 
+  st_centroid()
+vnm.adm.cm.02.centroid <- 
+  do.call("rbind",vnm.adm.cm.02.centroid$geometry)
+colnames(vnm.adm.cm.02.centroid) <- c("lon","lat")
+# combine the centroid with sf() file
+vnm.adm.cm.02<- cbind(vnm.adm.cm.02, 
+                      vnm.adm.cm.02.centroid
+                      )
+
+# plot a white map of Ca Mau province
+map.cm.district <- 
+  ggplot(vnm.adm.cm.02) + 
+  geom_sf(fill = "transparent", colour = "white") +
+  geom_text_repel(data = vnm.adm.cm.02, 
+                  aes(x = lon, y = lat),
+                  label = vnm.adm.cm.02$VARNAME_2,
+                  color = "white",
+                  size = 2,
+                  na.rm = TRUE
+  ) +
+  theme_void()
+df_plots <- 
+  data_frame(x = c(105.075, 105.25), 
+             y = c(9.05, 9.05), 
+             width = 0.2,
+             height = 0.2, 
+             plot = list(map.whole.republic,
+                         map.cm.district
+                         )
+             )
+
+# Combine all the four maps above
+map.sat.cm.target.district.commune <- 
+  map.sat.cm.commune.name.three.communes + 
+  ggimage::geom_subview(aes(x = x,
+                            y = y,
+                            subview = plot, 
+                            width = width,
+                            height = height
+                            ), 
+                        data = df_plots
+                       ) +
+  # vertical line
+  geom_segment(aes(x = 105.02, 
+                   xend = 105.02, 
+                   y = 9.15, 
+                   yend = 9.00
+  ),
+  colour = "white",
+  size = 0.5
+  ) +
+  # 
+  geom_segment(aes(x = 105.02, 
+                   xend = 105.05, 
+                   y = 9.00, 
+                   yend = 8.95
+  ),
+  colour = "white",
+  size = 0.5
+  ) +
+  # horizontal line
+  geom_segment(aes(x = 105.05, 
+                   xend = 105.3, 
+                   y = 8.95, 
+                   yend = 8.95
+  ),
+  colour = "white",
+  size = 0.5
+  ) +
+  # vertical line inside of submap area
+  geom_segment(aes(x = 105.175, 
+                   xend = 105.175, 
+                   y = 9.15, 
+                   yend = 8.98
+  ),
+  colour = "white",
+  size = 0.5
+  ) +
+  # text (Viennam) 
+  annotate("text", 
+           x = 105.10, 
+           y = 9.15, 
+           label = "Vietnam", 
+           colour = "white", 
+           size = 4
+  ) +
+  # text (Ca Mau Province)
+  annotate("text", 
+           x = 105.25, 
+           y = 9.15, 
+           label = "Ca Mau", 
+           colour = "white", 
+           size = 4
+  ) 
+
+# Save the map
+# Comment out when not in use
+# ggsave("map.sat.cm.target.district.commune.pdf",
+#        plot = map.sat.cm.target.district.commune
+#        )
+# #
+# ## --- END ---
 
