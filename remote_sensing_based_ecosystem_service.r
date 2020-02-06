@@ -25,7 +25,6 @@ library(viridis)
 library(viridisLite)
 
 # ---- read.data ----
-# ---- map.data ----
 # To download sf file, please refer to the following website.
 # The sf file is much lighter than .shp and suitable for R.
 # https://gadm.org/download_country_v3.html
@@ -73,6 +72,8 @@ hh.2010.sub <-
   dplyr::select(lon,
                 lat,
                 Code,
+                disct, 
+                village,
                 age,
                 sex,
                 edu_le,
@@ -130,43 +131,43 @@ hh.2010.sub <-
 # To check data set in detail
 # write_csv(hh.2010.sub, "hh.2010.sub.csv")
 
-# ---- summary.statistics.and.histogram ----
-# Make a descriptive statistics
-summary.hh.2010.sub <- 
-  hh.2010.sub %>% 
-  group_by(disct, village) %>% 
-  summarise(n = n(),
-            min.total.area = min(total_area),
-            mean.total.area = mean(total_area),
-            median.total.area = median(total_area),
-            max.total.area = max(total_area),
-            sd.total.area = sd(total_area)
-  )
-# print to confirm summary table content
-print(summary.hh.2010.sub, n = Inf)
-# # save the table
-# write.csv(summary.hh.2010.sub, "summary.hh.2010.sub.csv")
-
-# wrapped histogram by district
-hh.2010.sub %>% 
-  ggplot(aes(x = total_area))+
-  geom_histogram()+
-  facet_wrap(~ disct) +
-  theme_classic()
-# # save the histogram
-# ggsave("hh.2010.sub.hist.pdf")
-
-# density plot by district
-hh.2010.sub %>% 
-  ggplot(aes(x = total_area, colour = disct))+
-  geom_line(stat = "density", size = 1)+
-  scale_color_viridis_d(option = "viridis", aesthetics = "colour") +
-  labs(x = "Total area", y = "Density", colour = "District", ) +
-  theme_classic()
-# # save the density plot
-# ggsave("hh.2010.sub.density.pdf")
-#
-# END ---
+# # ---- summary.statistics.and.histogram ----
+# # Make a descriptive statistics
+# summary.hh.2010.sub <- 
+#   hh.2010.sub %>% 
+#   group_by(disct, village) %>% 
+#   summarise(n = n(),
+#             min.total.area = min(total_area),
+#             mean.total.area = mean(total_area),
+#             median.total.area = median(total_area),
+#             max.total.area = max(total_area),
+#             sd.total.area = sd(total_area)
+#   )
+# # print to confirm summary table content
+# print(summary.hh.2010.sub, n = Inf)
+# # # save the table
+# # write.csv(summary.hh.2010.sub, "summary.hh.2010.sub.csv")
+# 
+# # wrapped histogram by district
+# hh.2010.sub %>% 
+#   ggplot(aes(x = total_area))+
+#   geom_histogram()+
+#   facet_wrap(~ disct) +
+#   theme_classic()
+# # # save the histogram
+# # ggsave("hh.2010.sub.hist.pdf")
+# 
+# # density plot by district
+# hh.2010.sub %>% 
+#   ggplot(aes(x = total_area, colour = disct))+
+#   geom_line(stat = "density", size = 1)+
+#   scale_color_viridis_d(option = "viridis", aesthetics = "colour") +
+#   labs(x = "Total area", y = "Density", colour = "District", ) +
+#   theme_classic()
+# # # save the density plot
+# # ggsave("hh.2010.sub.density.pdf")
+# #
+# # END ---
 
 
 # ---- map.camau ----
@@ -244,12 +245,11 @@ map.sat.vnm.cm.total.area <-
                    st.color = "white"
     ) 
 
-# save the plot
-# comment out when not in use
-ggsave("map.sat.vnm.cm.total.area.pdf",
-       plot = map.sat.vnm.cm.total.area
-       )
-
+# # save the plot
+# # comment out when not in use
+# ggsave("map.sat.vnm.cm.total.area.pdf",
+#        plot = map.sat.vnm.cm.total.area
+#        )
 #
 ### --- END ---
 
@@ -257,7 +257,7 @@ ggsave("map.sat.vnm.cm.total.area.pdf",
 # colouring by total area
 # total area
 map.osm.vnm.cm.total.area <- 
-ggplot(vnm.adm.cm) + 
+ggplot(vnm.adm.cm.01) + 
   annotation_map_tile(zoomin = 0, # This argument is adjusted automatically even if we fix it. 
                       type = "https://a.tile.openstreetmap.org/${z}/${x}/${y}.png"
   ) + 
@@ -763,16 +763,9 @@ print(barplot.cm.mangrove.aqua.02)
 # ggsave("barplot.cm.mangrove.aqua.02.pdf",
 #        plot = barplot.cm.mangrove.aqua.02
 #        )
-
-
 #
 #
 ##--- END ---
-
-##################################################################
-##################################################################
-##################################################################
-
 # selected data and consideration in detail
 # NOTE:
 # load required libraries in advance
@@ -1145,7 +1138,6 @@ ggsave("map.sat.cm.commune.name.whole.pdf",
 # 6 per commune: 148
 # 7 per commune: 153
 # 8 per commune: 192
-
 # ---- n.of.target ----
 communes.observed.2010 <- 
   hh.2010.sub %>% 
@@ -1185,15 +1177,23 @@ communes.target <-
                         )
                  )
             ) 
+
+table.communes.target <- 
+  knitr::kable(communes.target, 
+               format = "markdown", 
+               caption = "Target quadrats"
+               )
+
 # #
 # ## --- END ---
+
+
 
 
 # Map of target communes with maps of Vietnam and
 # Ca Mau province
 #
 # ---- map.sat.cm.target.district.commune ----
-
 # obtain a centroid of the 3 communes
 # The centroid is for obtaining Google satellite imagery.
 # and names of commune.
@@ -1299,7 +1299,7 @@ map.sat.cm.commune.name.three.communes <-
                  st.color = "white"
   ) 
 
-# ---- map.whole.republic ----
+# map.whole.republic
 map.whole.republic <- 
   ggplot(vnm.adm.00) +
   geom_sf(fill = "white") +
@@ -1344,7 +1344,7 @@ map.whole.republic <-
            size = 10) +
   theme_void()
 
-# ---- map.camau.by.district ----
+# map.camau.by.district
 # compute centroid by district
 vnm.adm.cm.02.centroid <- 
   vnm.adm.cm.02 %>% 
@@ -1370,7 +1370,7 @@ map.cm.district <-
   ) +
   theme_void()
 
-# ---- map.whole.republic ----
+# map.whole.republic
 map.whole.republic <- 
   ggplot(vnm.adm.00) +
   geom_sf(fill = "transparent", colour = "white") +
@@ -1424,7 +1424,7 @@ map.whole.republic <-
            ) +
   theme_void()
 
-# ---- map.camau.by.district ----
+# map.camau.by.district
 # compute centroid by district
 vnm.adm.cm.02.centroid <- 
   vnm.adm.cm.02 %>% 
@@ -1459,6 +1459,7 @@ df_plots <-
                          )
              )
 
+# map.sat.cm.target.district.commune
 # Combine all the four maps above
 map.sat.cm.target.district.commune <- 
   map.sat.cm.commune.name.three.communes + 
@@ -1523,6 +1524,8 @@ map.sat.cm.target.district.commune <-
            size = 4
   ) 
 
+map.sat.cm.target.district.commune
+
 # Save the map
 # Comment out when not in use
 # ggsave("map.sat.cm.target.district.commune.pdf",
@@ -1530,4 +1533,6 @@ map.sat.cm.target.district.commune <-
 #        )
 # #
 # ## --- END ---
+
+
 
