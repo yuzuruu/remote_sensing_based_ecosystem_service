@@ -1,7 +1,7 @@
 ############################################################
 # Ecosystem service estimation using remote sensing results
 # 09th. October 2019 First launch
-# **th. ****** **** Correction
+# 14th. January 2020 revision
 #
 # Entire codes will be synchronized on github.
 # https://github.com/yuzuruu/remote_sensing_based_ecosystem_service
@@ -14,14 +14,43 @@ library(rgdal)
 library(deldir)
 library(spatstat)
 library(spdep)
-library(ggspatial)
+library(ggimage)
+library(ggmap)
 library(ggsn)
+library(ggrepel)
+library(ggspatial)
 library(GGally)
 library(tidyverse)
 library(viridis)
 library(viridisLite)
 
 # ---- read.data ----
+# To download sf file, please refer to the following website.
+# The sf file is much lighter than .shp and suitable for R.
+# https://gadm.org/download_country_v3.html
+#
+# read the sf file
+vnm.adm.00 <- readRDS("gadm36_VNM_0_sf.rds") # province
+vnm.adm.01 <- readRDS("gadm36_VNM_1_sf.rds") # province
+vnm.adm.02 <- readRDS("gadm36_VNM_2_sf.rds") # district
+vnm.adm.03 <- readRDS("gadm36_VNM_3_sf.rds") # commune
+vnm.adm <- vnm.adm.03
+# Pick up data of Ca Mau province
+# Somehow it does not work.
+vnm.adm %>% dplyr::filter(NAME_1 == "Ca Mau")
+# It works.
+vnm.adm.cm.01 <- 
+  vnm.adm %>% 
+  dplyr::filter(GID_1 == "VNM.13_1")
+# To overwrite boundaries of province
+vnm.adm.cm.02 <- 
+  vnm.adm.02 %>% 
+  dplyr::filter(GID_1 == "VNM.13_1")
+vnm.adm.cm.03 <- 
+  vnm.adm.03 %>% 
+  dplyr::filter(GID_1 == "VNM.13_1")
+
+# read household survey data
 # To transform datum, please refer to the following page.
 # https://stackoverflow.com/questions/30018098/how-to-convert-utm-coordinates-to-lat-and-long-in-r
 # read data
@@ -38,21 +67,21 @@ colnames(utm.xy) <- c("lon","lat")
 hh.2010 <- bind_cols(hh.2010, utm.xy)
 # select required values
 ## choose any of requisite values
-
 hh.2010.sub <- 
   hh.2010 %>% 
   dplyr::select(lon,
                 lat,
                 Code,
+                disct, 
+                village,
                 age,
                 sex,
                 edu_le,
-                village,
-                disct,
                 prov,
                 total_area,
                 total_inco,
-                total_invest
+                total_invest,
+                check.status
   ) %>% 
   # Omit observations containing NAs
   na.omit() %>% 
@@ -60,69 +89,88 @@ hh.2010.sub <-
   dplyr::mutate(sex = factor(sex, levels = c(1,2)),
                 edu_le = factor(edu_le, levels = c(1,2,3,5,6))
   )
-#
-# END ---
+# pick up target district including target communes
+# evaluate how many target samples exist in the commues each
+# consider sampling / survey procedure
+find.district.fun <- 
+  function(lon, lat){
+    id.location <- sf::st_contains(vnm.adm.cm.02,
+                                   st_point(c(lon,
+                                              lat
+                                   )
+                                   ),
+                                   sparse = FALSE
+    ) %>% 
+      grep(TRUE, .)  
+    vnm.adm.cm.02$VARNAME_2[id.location]
+  }
 
-# ---- summary.statistics.and.histogram ----
-# Make a descriptive statistics
-summary.hh.2010.sub <- 
+find.commune.fun <- 
+  function(lon, lat){
+    id.location <- sf::st_contains(vnm.adm.cm.03,
+                                   st_point(c(lon,
+                                              lat
+                                   )
+                                   ),
+                                   sparse = FALSE
+    ) %>% 
+      grep(TRUE, .)  
+    vnm.adm.cm.03$VARNAME_3[id.location]
+  }
+# add names of district and commune from sf() files
+hh.2010.sub <- 
   hh.2010.sub %>% 
-  group_by(disct, village) %>% 
-  summarise(n = n(),
-            min.total.area = min(total_area),
-            mean.total.area = mean(total_area),
-            median.total.area = median(total_area),
-            max.total.area = max(total_area),
-            sd.total.area = sd(total_area)
-  )
-# print to confirm summary table content
-print(summary.hh.2010.sub, n = Inf)
-# # save the table
-# write.csv(summary.hh.2010.sub, "summary.hh.2010.sub.csv")
-
-# wrapped histogram by district
-hh.2010.sub %>% 
-  ggplot(aes(x = total_area))+
-  geom_histogram()+
-  facet_wrap(~ disct) +
-  theme_classic()
-# # save the histogram
-# ggsave("hh.2010.sub.hist.pdf")
-
-# density plot by district
-hh.2010.sub %>% 
-  ggplot(aes(x = total_area, colour = disct))+
-  geom_line(stat = "density", size = 1)+
-  scale_color_viridis_d(option = "viridis", aesthetics = "colour") +
-  labs(x = "Total area", y = "Density", colour = "District", ) +
-  theme_classic()
-# # save the density plot
-# ggsave("hh.2010.sub.density.pdf")
+  mutate(., 
+         district = map2(.$lon, .$lat, find.district.fun),
+         commune = map2(.$lon, .$lat, find.commune.fun)
+  ) %>% 
+  unnest(cols = c("district", "commune"))
 #
 # END ---
 
-# ---- map.data ----
-# To download sf file, please refer to the following website.
-# The sf file is much lighter than .shp and suitable for R.
-# https://gadm.org/download_country_v3.html
-#
-# read the sf file
-vnm.adm.01 <- readRDS("gadm36_VNM_1_sf.rds") # province
-vnm.adm.02 <- readRDS("gadm36_VNM_2_sf.rds") # district
-vnm.adm.03 <- readRDS("gadm36_VNM_3_sf.rds") # commune
-vnm.adm <- vnm.adm.03
-# Pick up data of Ca Mau province
-# Somehow it does not work.
-vnm.adm %>% dplyr::filter(NAME_1 == "Ca Mau")
-# It works.
-vnm.adm.cm <- 
-  vnm.adm %>% 
-  dplyr::filter(GID_1 == "VNM.13_1")
-# To overwrite boundaries of province
-vnm.adm.cm.02 <- 
-  vnm.adm.02 %>% 
-  dplyr::filter(GID_1 == "VNM.13_1")
+# To check data set in detail
+# write_csv(hh.2010.sub, "hh.2010.sub.csv")
 
+# # ---- summary.statistics.and.histogram ----
+# # Make a descriptive statistics
+# summary.hh.2010.sub <- 
+#   hh.2010.sub %>% 
+#   group_by(disct, village) %>% 
+#   summarise(n = n(),
+#             min.total.area = min(total_area),
+#             mean.total.area = mean(total_area),
+#             median.total.area = median(total_area),
+#             max.total.area = max(total_area),
+#             sd.total.area = sd(total_area)
+#   )
+# # print to confirm summary table content
+# print(summary.hh.2010.sub, n = Inf)
+# # # save the table
+# # write.csv(summary.hh.2010.sub, "summary.hh.2010.sub.csv")
+# 
+# # wrapped histogram by district
+# hh.2010.sub %>% 
+#   ggplot(aes(x = total_area))+
+#   geom_histogram()+
+#   facet_wrap(~ disct) +
+#   theme_classic()
+# # # save the histogram
+# # ggsave("hh.2010.sub.hist.pdf")
+# 
+# # density plot by district
+# hh.2010.sub %>% 
+#   ggplot(aes(x = total_area, colour = disct))+
+#   geom_line(stat = "density", size = 1)+
+#   scale_color_viridis_d(option = "viridis", aesthetics = "colour") +
+#   labs(x = "Total area", y = "Density", colour = "District", ) +
+#   theme_classic()
+# # # save the density plot
+# # ggsave("hh.2010.sub.density.pdf")
+# #
+# # END ---
+
+
+# ---- map.camau ----
 # Draw a map of administrative boundaries and overwrap survey points
 # We use OpenStreet map for base layer.
 # We can use google map. It, however, requires API when we use that many times.
@@ -132,12 +180,84 @@ vnm.adm.cm.02 <-
 # To overwrite the boundaries of districts and ones of wards, please refer to the 
 # following website.
 # https://stackoverflow.com/questions/49497182/ggplot-create-a-border-overlay-on-top-of-map
+#
+# read Google API
+# change the API code as you obtain from Google
+source("../../r_project/map.key.r")
+# set centroid using latitude and longitude
+lat.center.camau <- c(8.75)
+lon.center.camau <- c(105.05)
+# Obtain satellite imagery
+map.sat.vnm.cm.total.area <- 
+  get_map(location = c(lon = lon.center.camau,
+                       lat = lat.center.camau
+  ), 
+  maptype = "satellite",
+  zoom = 10
+  ) %>% 
+  ggmap() +
+  geom_sf(data = vnm.adm.cm.03,
+          colour = "grey60",
+          fill = "white",
+          alpha = 0.05,
+          inherit.aes = FALSE
+          ) +
+    xlim(104.7, 105.5) +
+    ylim(8.55, 9) +
+  # Overwrap survey point using survey results
+  geom_point(
+    data = hh.2010.sub,
+    aes(x = lon, y = lat, fill = total_area),
+    colour = "grey28",
+    shape = 21,
+    size = 2.5
+    ) +
+    scale_fill_viridis_c(option = "viridis",
+                         begin = 1,
+                         end = 0
+    ) +
+    labs(x = "Longitude", 
+         y = "Latitude",
+         fill = "Total area (Unit: Ha)",
+         caption = "\U00a9 Google"
+    ) +
+    theme_minimal() +
+  theme(
+    legend.position = c(0.8,0.3),
+    legend.title = element_text(colour = "white"),
+    legend.text = element_text(colour = "white")
+  ) +
+    # adjust scalebar's preferences
+    ggsn::scalebar(x.min = 105.0,
+                   x.max = 105.4,
+                   y.min = 8.56,
+                   y.max = 8.60, 
+                   dist_unit = "km",
+                   dist = 20, 
+                   st.size = 4,
+                   st.dist = 0.25,
+                   height = 0.25,
+                   model = "WGS84", 
+                   transform = TRUE,
+                   location = "bottomright",
+                   box.fill = c("grey30", "white"), # left and right
+                   box.color = "white",
+                   st.color = "white"
+    ) 
+
+# # save the plot
+# # comment out when not in use
+# ggsave("map.sat.vnm.cm.total.area.pdf",
+#        plot = map.sat.vnm.cm.total.area
+#        )
+#
+### --- END ---
 
 # ---- map.total.area ----
 # colouring by total area
 # total area
 map.osm.vnm.cm.total.area <- 
-ggplot(vnm.adm.cm) + 
+ggplot(vnm.adm.cm.01) + 
   annotation_map_tile(zoomin = 0, # This argument is adjusted automatically even if we fix it. 
                       type = "https://a.tile.openstreetmap.org/${z}/${x}/${y}.png"
   ) + 
@@ -643,16 +763,9 @@ print(barplot.cm.mangrove.aqua.02)
 # ggsave("barplot.cm.mangrove.aqua.02.pdf",
 #        plot = barplot.cm.mangrove.aqua.02
 #        )
-
-
 #
 #
 ##--- END ---
-
-##################################################################
-##################################################################
-##################################################################
-
 # selected data and consideration in detail
 # NOTE:
 # load required libraries in advance
@@ -680,8 +793,8 @@ utm.xy.selected <-
 # replace UTM location and the transformed location 
 hh.2010.selected <- 
   hh.2010.selected %>% 
-  mutate(X = utm.xy.selected$lon,
-         Y = utm.xy.selected$lat
+  mutate(lon = utm.xy.selected$lon,
+         lat = utm.xy.selected$lat
            ) %>% 
   rename(lon = X,
          lat = Y
@@ -689,67 +802,737 @@ hh.2010.selected <-
 #
 ## --- END ---
 
-# ---- find.contradiction ----
-# find contradictional samples using condition match
-# Note
-# After finding some candidate of the contradictional samples,
-# we need to consider whether they match or not individually.
-# 1. Those who do not use mangroves and use for some purposes.
-# fuel
-selected.id.011 <- 
-  hh.2010.selected  %>%  
-  dplyr::filter(use_man == 2 & fuel != 0) %>% 
-  dplyr::select(id)
-print(as.character(selected.id.011$id))
-# construction
-selected.id.012 <- 
-  hh.2010.selected  %>%  
-  dplyr::filter(use_man == 2 & construction != 0) %>% 
-  dplyr::select(id)
-print(as.character(selected.id.012$id))
-# fishing
-selected.id.013 <- 
-  hh.2010.selected  %>%  
-  dplyr::filter(use_man == 2 & fishing != 0) %>% 
-  dplyr::select(id)
-print(as.character(selected.id.013$id))
-# resting
-selected.id.014 <- 
-  hh.2010.selected  %>%  
-  dplyr::filter(use_man == 2 & resting != 0) %>% 
-  dplyr::select(id)
-print(as.character(selected.id.014$id))
-# maching function (7 observations were found.)
-selected.id.01 <- 
-  union(selected.id.011, selected.id.012) %>% 
-  union(selected.id.013) %>% 
-  union(selected.id.014)
-# 2. Those who use mangroves and do not use for any purposes.
-selected.id.02 <- 
-  hh.2010.selected  %>%  
-  dplyr::filter(use_man == 1 & fuel == 0 & construction == 0 & fishing == 0 & resting == 0) %>% 
-  dplyr::select(id)
-print(as.character(selected.id.02$id)) # 43 observations were found
-# pick up ids of contradictional observation
-# Note
-# After finding some candidate of the contradictional samples,
-# we need to consider whether they match or not individually.
-contradictional.id <- 
-  dplyr::bind_rows(selected.id.01, selected.id.02) %>% 
-  dplyr::arrange(id)
-# save observations including contradiction
-hh.2010.selected.contradiction <- 
-  hh.2010.selected %>% 
-  dplyr::filter(id %in% as.numeric(contradictional.id$id))
-write.csv(hh.2010.selected.contradiction, "hh.2010.selected.contradiction.csv")
+# # ---- find.contradiction ----
+# # NOTE on 5th. November 2019
+# # The selected data is not sceptical. The contradiction of
+# # answers results from limitation of interview survey.
+# # This time, we treat the data as "TRUE" data.
+# # For reference, I will leave the code.
+# # find contradictional samples using condition match
+# # Note
+# # After finding some candidate of the contradictional samples,
+# # we need to consider whether they match or not individually.
+# # 1. Those who do not use mangroves and use for some purposes.
+# # fuel
+# selected.id.011 <- 
+#   hh.2010.selected  %>%  
+#   dplyr::filter(use_man == 2 & fuel != 0) %>% 
+#   dplyr::select(id)
+# print(as.character(selected.id.011$id))
+# # construction
+# selected.id.012 <- 
+#   hh.2010.selected  %>%  
+#   dplyr::filter(use_man == 2 & construction != 0) %>% 
+#   dplyr::select(id)
+# print(as.character(selected.id.012$id))
+# # fishing
+# selected.id.013 <- 
+#   hh.2010.selected  %>%  
+#   dplyr::filter(use_man == 2 & fishing != 0) %>% 
+#   dplyr::select(id)
+# print(as.character(selected.id.013$id))
+# # resting
+# selected.id.014 <- 
+#   hh.2010.selected  %>%  
+#   dplyr::filter(use_man == 2 & resting != 0) %>% 
+#   dplyr::select(id)
+# print(as.character(selected.id.014$id))
+# # maching function (7 observations were found.)
+# selected.id.01 <- 
+#   union(selected.id.011, selected.id.012) %>% 
+#   union(selected.id.013) %>% 
+#   union(selected.id.014)
+# # 2. Those who use mangroves and do not use for any purposes.
+# selected.id.02 <- 
+#   hh.2010.selected  %>%  
+#   dplyr::filter(use_man == 1 & fuel == 0 & construction == 0 & fishing == 0 & resting == 0) %>% 
+#   dplyr::select(id)
+# print(as.character(selected.id.02$id)) # 43 observations were found
+# # pick up ids of contradictional observation
+# # Note
+# # After finding some candidate of the contradictional samples,
+# # we need to consider whether they match or not individually.
+# contradictional.id <- 
+#   dplyr::bind_rows(selected.id.01, selected.id.02) %>% 
+#   dplyr::arrange(id)
+# # save observations including contradiction
+# hh.2010.selected.contradiction <- 
+#   hh.2010.selected %>% 
+#   dplyr::filter(id %in% as.numeric(contradictional.id$id))
+# write.csv(hh.2010.selected.contradiction, "hh.2010.selected.contradiction.csv")
+# 
+# # omit samples excluding contradictional samples
+# # If there would not be any problems, let us omit the
+# # contradictional samples.
+# hh.2010.selected.02 <- 
+#   hh.2010.selected %>% 
+#   dplyr::filter(!(id %in% as.numeric(contradictional.id$id)))
+# 
+# #
+# ## --- END ---
 
-# omit samples excluding contradictional samples
-# If there would not be any problems, let us omit the
-# contradictional samples.
-hh.2010.selected.02 <- 
-  hh.2010.selected %>% 
-  dplyr::filter(!(id %in% as.numeric(contradictional.id$id)))
 
+
+# # WARNING
+# # THIS PROCESS NEEDS COMPUTATION PERIOD.
+# # COMMENT OUT WHEN NOT IN USE.
+# # Make maps to detect farmers' / fishermen's using areas
+# # By having them draw an area (circle, rectangle), we are able to 
+# # obtain exact information on their land use.
+# # read Google API
+# # change the API code as you obtain from Google
+# ---- area.map ----
+source("../../r_project/map.key.r")
+
+# # set common arguments
+# # When we adjust settings of the map, adjust the following argument.
+# # ---- set.common.arguments ----
+# cellsize  <-  25 # size of cell (unit: meter (m))
+# alpha  <-  0.1 # alpha channel (0.1 should be better.)
+# zoom <-  17 # zooming 
+# # location of target and their id
+# lon.lat.id <- list(center.lon = hh.2010.sub$lon,
+#                    center.lat = hh.2010.sub$lat,
+#                    id = c(1:nrow(hh.2010.sub))
+# )
+# #
+# ## --- END ---
+# 
+# # function to make a boundary box
+# # Original code is below.
+# # https://stackoverflow.com/questions/47749078/how-to-put-a-geom-sf-produced-map-on-top-of-a-ggmap-produced-raster
+# # EPSG by google can be obtained from below.
+# # https://colauttilab.github.io/EcologyTutorials/mapping.html
+# # ---- ggmap.bbox.fun ----
+# ggmap.bbox.fun <- function(sat.map) {
+#   if (!inherits(sat.map, "ggmap")) stop("map must be a ggmap object")
+#   # Extract the bounding box (in lat/lon) from the ggmap to a numeric vector, 
+#   # and set the names to what sf::st_bbox expects:
+#   map_bbox <- setNames(unlist(attr(sat.map, 
+#                                    "bb"
+#                                    )
+#                               ), 
+#                        c("ymin", 
+#                          "xmin", 
+#                          "ymax", 
+#                          "xmax"
+#                          )
+#                        )
+#   # Coonvert the bbox to an sf polygon, transform it to 3857, 
+#   # and convert back to a bbox (convoluted, but it works)
+#   # st_as_sfc requires CRS. Google maps obtained from get_map() has no CRS info.
+#   # We need to set the temporal CRS first. Then we transform the temporal CRS
+#   # into real one (3857).
+#   bbox.3857 <- 
+#     map_bbox %>% 
+#     st_bbox(crs = 4326) %>%
+#     st_as_sfc %>% 
+#     st_transform(crs = 3857) %>%
+#     st_bbox()
+#   # Overwrite the bbox of the ggmap object with the transformed coordinates 
+#   # Names below can be obtained using str(map) function
+#   attr(sat.map, "bb")$ll.lat <- bbox.3857["ymin"]
+#   attr(sat.map, "bb")$ll.lon <- bbox.3857["xmin"]
+#   attr(sat.map, "bb")$ur.lat <- bbox.3857["ymax"]
+#   attr(sat.map, "bb")$ur.lon <- bbox.3857["xmax"]
+#   sat.map
+# }
+# #
+# ## --- END ---
+# 
+# # obtain a map from Google
+# # Internet connection and Google API are necessary.
+# # ---- sat.grid.fun ----
+# sat.grid.fun <- function(center.lon, center.lat, id){
+#   sat.map <- 
+#     get_map(location = c(lon = center.lon,
+#                        lat = center.lat
+#                        ),
+#           maptype = "satellite",
+#           zoom = zoom
+#           ) 
+#     # make grids
+#     # 
+#     # https://tsukubar.github.io/r-spatial-guide/simple-feature-for-r.html
+#     map.grid <- 
+#       tibble::data_frame(
+#         id = seq(1,2),
+#         lon = as.numeric(unlist(attr(sat.map, which = "bb"))[c(2,4)]),
+#         lat = as.numeric(unlist(attr(sat.map, which = "bb"))[c(1,3)])
+#       ) %>% 
+#       st_as_sf(coords = c("lon","lat"),
+#                crs = 4326
+#       ) %>% 
+#       st_transform(crs = 3857) %>% 
+#       st_bbox() %>% 
+#       sf::st_make_grid(.,
+#                        cellsize = cellsize # size of grid. Unit is metre (m)
+#       ) 
+#     
+#     # make a ggplot-object map from the obtained map and
+#     # overlay the grid on the map
+#     sat.map <- ggmap.bbox.fun(sat.map)
+#     
+#     ggmap(sat.map) + 
+#       coord_sf(crs = st_crs(3857)) + # force the ggplot2 map to be in 3857
+#       geom_sf(data = map.grid, 
+#               fill = "white", 
+#               colour = "white",
+#               alpha = alpha, 
+#               lwd = 0.01,
+#               inherit.aes = FALSE
+#               ) +
+#       labs(x = "Longitude",
+#            y = "Latitude",
+#            title = id,
+#            subtitle = paste("Size of square is", cellsize,"m*", cellsize, "m")
+#            ) +
+#       theme_minimal()
+#     }
+# #
+# ## --- END ---
+# 
+# # save the maps as a pdf file
+# # comment out when not in use.
+# # ---- target.landuse.map ----
+# # pdf("target_landuse_survey_map.pdf")
+# # lon.lat.id %>%
+# #   pmap(sat.grid.fun)
+# # dev.off()
+# #
+# #
+# ## --- END ---
+# 
+
+
+# Ca Mau province map by commune / ward
+# ---- read.sf.data ----
+# province
+vnm.adm.cm.01 <- 
+  vnm.adm.01 %>% 
+  dplyr::filter(GID_1 == "VNM.13_1")
+# To overwrite boundaries of province
+vnm.adm.cm.02 <- 
+  vnm.adm.02 %>% 
+  dplyr::filter(GID_1 == "VNM.13_1") %>% 
+  mutate(centroid = map(.$geometry, st_centroid))
+vnm.adm.cm.03 <- 
+  vnm.adm.03 %>% 
+  dplyr::filter(GID_1 == "VNM.13_1") %>% 
+  mutate(centroid = map(.$geometry, st_centroid))
 #
 ## --- END ---
+
+
+# ---- compute.centroid.by.commune ----
+# How to use do.call(), refer to the following webpage.
+# http://www.okadajp.org/RWiki/?%E3%83%AA%E3%82%B9%E3%83%88Tips%E5%A4%A7%E5%85%A8#kd290b33
+# make a function to do that at a time
+# Warning
+# To avoid malfunction to use tidyverse(), we make the function
+# by base() package.
+st_centroid.fun <- function(geometry, VARNAME_3){
+    sf::st_centroid(geometry) %>% # compute centroid
+    base::do.call("rbind", .) %>% 
+    base::cbind(., VARNAME_3) %>% 
+    base::data.frame()
+  }
+# compute centroid
+vnm.adm.cm.03.centroid <- 
+  st_centroid.fun(vnm.adm.cm.03$geometry, 
+                  vnm.adm.cm.03$VARNAME_3
+                  )
+# rename the data containing centroid
+colnames(vnm.adm.cm.03.centroid) <- 
+  c("lon",
+    "lat",
+    "VARNAME_3"
+    )
+# convert data type
+vnm.adm.cm.03.centroid <- 
+  vnm.adm.cm.03.centroid %>% 
+  as_tibble() %>% 
+  mutate(lon = as.numeric(as.character(lon)),
+         lat = as.numeric(as.character(lat))
+         )
+# merge the centroid data and original sf data
+vnm.adm.cm.03 <-left_join(vnm.adm.cm.03, vnm.adm.cm.03.centroid, by = "VARNAME_3")
+# compute the centroid of Ca Mau province to download google satellite imagery
+camau.center <- 
+  st_centroid(vnm.adm.cm.01) %>% 
+  unlist() %>% 
+  data.frame() %>% 
+  setNames("geometry")
+cm.center.lon <- as.numeric(as.character(camau.center$geometry[11]))
+cm.center.lat <- as.numeric(as.character(camau.center$geometry[12]))
+# #
+# ## --- END ---
+
+# ---- map.sat.cm.by.commune ----
+# download satellite image
+sat.map.cm <-
+  get_map(location = c(lon = cm.center.lon,
+                       lat = cm.center.lat
+                       ),
+          maptype = "satellite",
+          zoom = 9
+          )
+# add communes' boundaries and names to the satellite imagery
+map.sat.cm.commune.name.whole <- 
+  ggmap(sat.map.cm) +
+  coord_sf(crs = st_crs(3857)) +
+  geom_sf(data = vnm.adm.cm.03,
+          color = "white",
+          fill = "transparent",
+          size=0.125,
+          inherit.aes = FALSE
+  ) +
+  geom_sf(data = vnm.adm.cm.02,
+          color = "white", 
+          fill = "transparent", 
+          size=1,
+          inherit.aes = FALSE
+  ) +
+  geom_text_repel(data = vnm.adm.cm.03, 
+                  label = vnm.adm.cm.03$VARNAME_3,
+                  color = "white",
+                  size = 1.5,
+                  na.rm = TRUE
+                  ) +
+  labs(x = "Longitude", y = "Latitude") +
+  xlim(104.7, 105.7) +
+  ylim(8.55, 9.55) +
+  ggsn::scalebar(x.min = 105.4,
+                 x.max = 105.60,
+                 y.min = 8.60,
+                 y.max = 8.65, 
+                 dist_unit = "km",
+                 dist = 20, 
+                 st.size = 3,
+                 st.dist = 0.25,
+                 height = 0.25,
+                 model = "WGS84", 
+                 transform = TRUE,
+                 location = "bottomright",
+                 box.fill = c("grey30", "white"), # left and right
+                 box.color = "white",
+                 st.color = "white"
+  ) 
+# save the map
+ggsave("map.sat.cm.commune.name.whole.pdf", 
+       plot = map.sat.cm.commune.name.whole
+       )
+# #
+# ## --- END ---
+
+# pick up target district including target communes
+# evaluate how many target samples exist in the commues each
+# consider sampling / survey procedure
+# When 5 observations should be collected from each commune,
+# n. will be as follows:
+# n. of observed in 2010 and still exist (available to be panel data): 53
+# n. of observed in 2010 and NOT exist (so should be added to): 22
+# n. of NOT observed in 2010 and to be observed: 40
+# 115 in total
+# Note
+# 6 per commune: 148
+# 7 per commune: 153
+# 8 per commune: 192
+# ---- n.of.target ----
+communes.observed.2010 <- 
+  hh.2010.sub %>% 
+  dplyr::filter(district %in% c("Phu Tan",
+                                "Nam Can",
+                                "Ngoc Hien")) %>% 
+  dplyr::filter(check.status == 1) %>% 
+  dplyr::group_by(district, commune) %>% 
+  dplyr::summarize_at(vars(check.status), funs(length))
+communes.to.be.observed <- 
+  vnm.adm.cm.03 %>% 
+  st_drop_geometry() %>% 
+  dplyr::filter(GID_2 %in% c("VNM.13.6_1", # Phu Tan
+                             "VNM.13.5_1", # Ngok Hien
+                             "VNM.13.4_1" # Nam Can
+                             )
+                ) %>% 
+  dplyr::filter(VARNAME_3 %in% setdiff(levels(factor(.$VARNAME_3)), 
+                                       communes.observed.2010$commune)
+                ) %>% 
+  dplyr::select(NAME_2,VARNAME_3) %>% 
+  mutate(check.status = 0) %>% 
+  dplyr::rename(district = NAME_2,
+                commune = VARNAME_3,
+                check.status = check.status
+                ) %>% 
+  as_tibble()
+communes.target <- 
+  bind_rows(communes.observed.2010, 
+            communes.to.be.observed
+            ) %>% 
+  mutate(additional.observation = 8-check.status) %>% 
+  mutate_at(vars(additional.observation), 
+            funs(ifelse(additional.observation<0,
+                        0,
+                        .
+                        )
+                 )
+            ) 
+
+table.communes.target <- 
+  knitr::kable(communes.target, 
+               format = "markdown", 
+               caption = "Target quadrats"
+               )
+
+# #
+# ## --- END ---
+
+
+
+
+# Map of target communes with maps of Vietnam and
+# Ca Mau province
+#
+# ---- map.sat.cm.target.district.commune ----
+# obtain a centroid of the 3 communes
+# The centroid is for obtaining Google satellite imagery.
+# and names of commune.
+# sf() added centroids by commune
+vnm.adm.cm.03.three.communes <- 
+  vnm.adm.cm.03 %>% 
+  dplyr::filter(GID_2 %in% c("VNM.13.6_1", # Phu Tan
+                             "VNM.13.5_1", # Ngok Hien
+                             "VNM.13.4_1" # Nam Can
+  )
+  ) 
+# sf() added centroids by district
+vnm.adm.cm.02.three.communes <- 
+  vnm.adm.cm.02 %>% 
+  dplyr::filter(GID_2 %in% c("VNM.13.6_1", # Phu Tan
+                             "VNM.13.5_1", # Ngok Hien
+                             "VNM.13.4_1" # Nam Can
+  )
+  ) 
+# centroid of Ca Mau province
+cm.center.three.communes <- 
+  vnm.adm.cm.03 %>% 
+  dplyr::filter(GID_2 %in% c("VNM.13.6_1", # Phu Tan
+                             "VNM.13.5_1", # Ngok Hien
+                             "VNM.13.4_1" # Nam Can
+  )
+  ) %>%
+  sf::st_union() %>% 
+  sf::st_centroid() %>% 
+  base::do.call("rbind", .) %>% 
+  base::data.frame()
+colnames(cm.center.three.communes) <- c("lon", "lat")
+
+# Data obtained in 2020 belonging to the three communes
+hh.2010.sub.three.communes<-
+  hh.2010.sub %>% 
+  dplyr::filter(district %in% c("Nam Can","Ngoc Hien","Phu Tan"))
+
+# obtain a satellite imagery from Google maps
+sat.map.cm.three.communes <-
+  get_map(location = c(lon = cm.center.three.communes$lon,
+                       lat = cm.center.three.communes$lat
+  ),
+  maptype = "satellite",
+  zoom = 10
+  )
+# map with target communes on satellite imagery
+map.sat.cm.commune.name.three.communes <- 
+  ggmap(sat.map.cm.three.communes) +
+  coord_sf(crs = st_crs(3857)) +
+  geom_sf(data = vnm.adm.cm.03.three.communes,
+          color = "white",
+          fill = "transparent",
+          size=0.125,
+          inherit.aes = FALSE
+  ) +
+  geom_sf(data = vnm.adm.cm.02.three.communes,
+          color = "white",
+          fill = "transparent",
+          size=1,
+          inherit.aes = FALSE
+  ) +
+  geom_point(data = hh.2010.sub.three.communes,
+             aes(x = lon, 
+                 y = lat,colour = as.factor(check.status)
+                 )
+             ) +
+  # We do not display points unavailable to perform survey
+  # Because of development and other reasons, we skip the 
+  # targets obtained in 2010
+  scale_colour_manual(values = 
+                        c("transparent",
+                          "yellow" # points collected in 2010 and existing in 2020
+                          )
+                      ) +
+  # communes' names
+  geom_text_repel(data = vnm.adm.cm.03.three.communes, 
+                  label = vnm.adm.cm.03.three.communes$VARNAME_3,
+                  color = "white",
+                  size = 2,
+                  na.rm = TRUE
+  ) +
+  labs(x = "Longitude", y = "Latitude") +
+  xlim(104.7, 105.30) +
+  ylim(8.55, 9.15) +
+  theme(
+    legend.position = "none"
+  ) +
+  ggsn::scalebar(x.min = 105.2,
+                 x.max = 105.3,
+                 y.min = 8.57,
+                 y.max = 8.60, 
+                 dist_unit = "km",
+                 dist = 10, 
+                 st.size = 3,
+                 st.dist = 0.3,
+                 height = 0.25,
+                 model = "WGS84", 
+                 transform = TRUE,
+                 location = "bottomright",
+                 box.fill = c("grey30", "white"), # left and right
+                 box.color = "white",
+                 st.color = "white"
+  ) 
+
+# map.whole.republic
+map.whole.republic <- 
+  ggplot(vnm.adm.00) +
+  geom_sf(fill = "white") +
+  # Ha Noi
+  geom_point(aes(x = 105.80, # Ha Noi
+                 y = 21.0,
+  ),
+  size = 5
+  ) +
+  annotate("text", 
+           x = 105.80, 
+           y = 21.5, 
+           label = "Ha Noi"
+           ) +
+  # HCMC
+  geom_point(aes(x = 106.50, # HCMC
+                 y = 10.80
+  ),
+  size = 5
+  ) +
+  annotate("text", 
+           x = 104.80, 
+           y = 11.2, 
+           label = "Ho Chi Minh City"
+           ) +
+  # Ca Mau
+  geom_point(aes(x = 105.14, # Ca Mau
+                 y = 9.18
+  ),
+  size = 5
+  ) +
+  annotate("text", 
+           x = 106.2, 
+           y = 9.18, 
+           label = "Ca Mau"
+           ) +
+  # Vietnam
+  annotate("text", 
+           x = 105.00, 
+           y = 15.5, 
+           label = "Vietnam", 
+           size = 10) +
+  theme_void()
+
+# map.camau.by.district
+# compute centroid by district
+vnm.adm.cm.02.centroid <- 
+  vnm.adm.cm.02 %>% 
+  st_centroid()
+vnm.adm.cm.02.centroid <- 
+  do.call("rbind",vnm.adm.cm.02.centroid$geometry)
+colnames(vnm.adm.cm.02.centroid) <- c("lon","lat")
+# combine the centroid with sf() file
+vnm.adm.cm.02<- 
+  cbind(vnm.adm.cm.02, 
+        vnm.adm.cm.02.centroid
+        )
+# plot a white map of Ca Mau province
+map.cm.district <- 
+  ggplot(vnm.adm.cm.02) + 
+  geom_sf(fill = "transparent", colour = "white") +
+  geom_text_repel(data = vnm.adm.cm.02, 
+                  aes(x = lon, y = lat),
+                  label = vnm.adm.cm.02$VARNAME_2,
+                  color = "white",
+                  size = 2,
+                  na.rm = TRUE
+  ) +
+  theme_void()
+
+# map.whole.republic
+map.whole.republic <- 
+  ggplot(vnm.adm.00) +
+  geom_sf(fill = "transparent", colour = "white") +
+  # Ha Noi
+  # point
+  geom_point(aes(x = 105.80, # Ha Noi
+                 y = 21.0,
+  ),
+  size = 3,
+  colour = "white"
+  ) +
+  # text
+  annotate("text", 
+           x = 108.10, 
+           y = 21.0, 
+           label = "Ha Noi", 
+           colour = "white", 
+           size = 2.5
+           ) +
+  # HCMC
+  # point
+  geom_point(aes(x = 106.50, # HCMC
+                 y = 11.00
+  ),
+  size = 3,
+  colour = "white"
+  ) +
+  # text
+  annotate("text", 
+           x = 108.00, 
+           y = 12.0, 
+           label = "Ho Chi Minh City", 
+           colour = "white", 
+           size = 2.5
+           ) +
+  # Ca Mau
+  # point
+  geom_point(aes(x = 105.14, # Ca Mau
+                 y = 9.18
+  ),
+  size = 3,
+  colour = "white"
+  ) +
+  # text
+  annotate("text", 
+           x = 107.85, 
+           y = 9.18, 
+           label = "Ca Mau", 
+           colour = "white", 
+           size = 2.5
+           ) +
+  theme_void()
+
+# map.camau.by.district
+# compute centroid by district
+vnm.adm.cm.02.centroid <- 
+  vnm.adm.cm.02 %>% 
+  st_centroid()
+vnm.adm.cm.02.centroid <- 
+  do.call("rbind",vnm.adm.cm.02.centroid$geometry)
+colnames(vnm.adm.cm.02.centroid) <- c("lon","lat")
+# combine the centroid with sf() file
+vnm.adm.cm.02<- cbind(vnm.adm.cm.02, 
+                      vnm.adm.cm.02.centroid
+                      )
+
+# plot a white map of Ca Mau province
+map.cm.district <- 
+  ggplot(vnm.adm.cm.02) + 
+  geom_sf(fill = "transparent", colour = "white") +
+  geom_text_repel(data = vnm.adm.cm.02, 
+                  aes(x = lon, y = lat),
+                  label = vnm.adm.cm.02$VARNAME_2,
+                  color = "white",
+                  size = 2,
+                  na.rm = TRUE
+  ) +
+  theme_void()
+df_plots <- 
+  data_frame(x = c(105.075, 105.25), 
+             y = c(9.05, 9.05), 
+             width = 0.2,
+             height = 0.2, 
+             plot = list(map.whole.republic,
+                         map.cm.district
+                         )
+             )
+
+# map.sat.cm.target.district.commune
+# Combine all the four maps above
+map.sat.cm.target.district.commune <- 
+  map.sat.cm.commune.name.three.communes + 
+  ggimage::geom_subview(aes(x = x,
+                            y = y,
+                            subview = plot, 
+                            width = width,
+                            height = height
+                            ), 
+                        data = df_plots
+                       ) +
+  # vertical line
+  geom_segment(aes(x = 105.02, 
+                   xend = 105.02, 
+                   y = 9.15, 
+                   yend = 9.00
+  ),
+  colour = "white",
+  size = 0.5
+  ) +
+  # 
+  geom_segment(aes(x = 105.02, 
+                   xend = 105.05, 
+                   y = 9.00, 
+                   yend = 8.95
+  ),
+  colour = "white",
+  size = 0.5
+  ) +
+  # horizontal line
+  geom_segment(aes(x = 105.05, 
+                   xend = 105.3, 
+                   y = 8.95, 
+                   yend = 8.95
+  ),
+  colour = "white",
+  size = 0.5
+  ) +
+  # vertical line inside of submap area
+  geom_segment(aes(x = 105.175, 
+                   xend = 105.175, 
+                   y = 9.15, 
+                   yend = 8.98
+  ),
+  colour = "white",
+  size = 0.5
+  ) +
+  # text (Viennam) 
+  annotate("text", 
+           x = 105.10, 
+           y = 9.15, 
+           label = "Vietnam", 
+           colour = "white", 
+           size = 4
+  ) +
+  # text (Ca Mau Province)
+  annotate("text", 
+           x = 105.25, 
+           y = 9.15, 
+           label = "Ca Mau", 
+           colour = "white", 
+           size = 4
+  ) 
+
+map.sat.cm.target.district.commune
+
+# Save the map
+# Comment out when not in use
+# ggsave("map.sat.cm.target.district.commune.pdf",
+#        plot = map.sat.cm.target.district.commune
+#        )
+# #
+# ## --- END ---
+
+
 

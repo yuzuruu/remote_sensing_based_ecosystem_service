@@ -1,0 +1,153 @@
+---
+title: "Survey protocol camau March 2020"
+author: "Yuzuru Utsunomiya"
+date: "`r Sys.time()`"
+output:
+  rmdformats::html_clean:
+    highlight: kate
+  fig_caption: true
+  use_bookdown: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r include = FALSE}
+knitr::read_chunk("remote_sensing_based_ecosystem_service.R")
+```
+
+```{r load.library, include = FALSE, warning = FALSE, message = FALSE, echo=FALSE}
+```
+
+```{r area.key, include = FALSE, warning = FALSE, message = FALSE, echo=FALSE}
+```
+
+```{r read.data, include = FALSE, warning = FALSE, message = FALSE, echo=FALSE}
+```
+
+```{r read.sf.data, include = FALSE, warning = FALSE, message = FALSE, echo=FALSE}
+```
+
+```{r compute.centroid.by.commune, include = FALSE, warning = FALSE, message = FALSE, echo=FALSE}
+```
+
+```{r map.sat.cm.by.commune, include = FALSE, warning = FALSE, message = FALSE, echo=FALSE}
+```
+
+```{r n.of.target, include = FALSE, warning = FALSE, message = FALSE, echo=FALSE}
+```
+
+```{r map.sat.cm.target.district.commune, include = FALSE, warning = FALSE, message = FALSE, echo=FALSE}
+```
+
+
+# Introduction
+## Purpose of this survey
+To estimate ecosystem service derived from mangrove, we will conduct structured interviews with households located in Ca Mau, especially focusing on drivers of ecosystem service. 
+
+This research provides us the followings: First, we are able to estimate accurate ecosystem service while combining socioeconomic situation and land use from satellite imagery. second, we are able to discuss on the ecosystem service based on panel data.
+
+## Target
+Our targets are households living in 24 communes, Ca Mau province. In 2010, a survey has been done in this region. Mangrove forests surrounding there is in danger of extinction. In terms of conservation of the mangrove and establishment of sustainable economy, understanding there is vital issue.
+
+For 120 households located in 24 communes of Ca Mau province, we would like to perform the survey. Using Google Maps, we checked current situations of target household in 2010. Some of them have been disappeared and others still remains. Because of development such as shrimp pond, forestation, and others, they have been forced to move.
+
+The map below shows location of visited households in 2010. There are 65 points in total. There are points more than 10 in some communes and is no points in other communes. This time, to cover the skipped communes, we expand survey target to the communes as well as visited communes.
+
+```{r map.sat.cm.target.district.commune, include = TRUE, echo=FALSE, warning = FALSE, message = FALSE, fig.align = "center", out.width='100%', fig.cap = "Target communes of survey FY2020. Points in yellow show locations of target household in 2010. Background satellite imagery is obtained from Google Maps.(Click to enlarge)"}
+plot(map.sat.cm.target.district.commune)
+```
+
+Targets are classified into 3 groups as follows:
+
++ 53 households in 15 communes: The households in the communes have experienced survey in 2020. The households will be expected to "panel" data. This group includes the following communes; Dat Moi, Ham Rong, Hang Vinh, Hiep Tung, Lam Hai, Dat Mui, Rach Goc, Tan An Tay, Vien An Dong, Cai Doi Vam, Phu Tan, Rach Cheo, Tan Hung Tay, Viet Khai, and Viet Thang.
++ 22 in the 15 communes: In some communes of 15 communes above, the N. of household is insufficient. For smooth analysis, we need to add samples more. N. of additional samples differs depending on commune. 
++ 45 households in 9 communes: Households in the communes have NOT experienced survey in 2020. The communes includes followings; Nam Can, Tam Giang, Tam Giang Dong, Tam Giang Tay, Tan An, Vien An, Phu My, Phu Thuan, and Tan Hai commune.
+
+In detail of the N. of households by commune, please refer to the following table.
+
+```{r table.communes.target, include = TRUE, echo=FALSE, warning = FALSE}
+table.communes.target
+```
+
+## Model
+Some communes and household locate relatively close area, suggesting that we should consider spatial effect. For the situation, at first, we suppose the model given,
+
+
+$$
+y_{ijk} = \alpha_{k} + \sum_{i=1}^{n}\beta_{ik}x_{ik} + \rho\sum_{j=1}^{n}Wy_{jk}, \\
+i = 1,\dots,120\\
+j = 1,\dots,24\\
+t = 2010, 2020 
+$$
+
+where $y_{ijt}$ is income of household $i$ located at a village $j$ in year $t$; $\alpha$ denotes an intercept of this model; $\sum_{i=1}^{n}\beta_{i}x_{i}$ denotes a set of predictors; and $\rho\sum_{j=1}^{n}Wy_{jk}$ denotes a set of spatial effect.
+
+The predictors includes the following factors: 
+
++ education level of household's 
++ midset: We will obtain this item as a result of questionnaire while using k-means clustering.
++ NDVI: We will compute the NDVI referring to households' declaration. 
++ area
++ investment
++ production volume
+
+# Procedure
+## Transportation and accommodation
+On 16th. March, we will move from Can Tho to Ca Mau with a van. 
+
+## Survey group
+We will separate ourselves into some groups. For each group, we will rent a motorcycle.
+
++ Group 1: Prof. Tuan and Yuzuru
++ Group 2: 2 students
++ Group 3: 2 students
++ Group 4: 2 students
+
+## Data collection
+In accordance with the questionnaire, we will conduct interview surveys. For the interview, if possible, it is better to finish within 1 hour per household.
+
+At the same time, we will ask householder to circle their lands. Using the results, we will specify the area, pick that up from satellite imagery, compute NDVI, and analyse. 
+
+In each of day, Yuzuru will collect survey sheets and input the results.
+
+## tentative Schedule
++ Day 1 (15th. March 2020)
+    - Morning: Meeting on the survey
+    - Afternoon: Move from Can Tho to Ca mau
+    - Accommodation: Dat Mui
++ Day 2 (16th. March 2020) 
+    - Morning: Interviews with households @ Dat Mui, Vien An, Vien An DOng, and Rach Goc commune
+    - Afternoon: Interviews with households (Continued)
+    - Accommodation: Nam Can
++ Day 3 (17th. March 2020)
+    - Morning: Interviews with households @ Tam Giang, Tam Giang Dong, Tam Giang Tay, and Tan An commune
+    - Afternoon: Interviews with households (Continued)
+    - Accommodation: Nam Can
++ Day 4 (18th. March 2020) 
+    - Morning: Interviews with households @ Phu My, Phu Tan, Tan, Ha, and Ca Doi Van commune
+    - Afternoon: Interviews with households (Continued)
+    - Accommodation: Ca Doi Van commune
++ Day 5 (19th. March 2020) 
+    - Morning: Interviews with households @ Phu Thuan, Tan Hung Tay, Viet Thang, and Rach Cheo commune
+    - Afternoon: Interviews with households (Continued)
+    - Accommodation: Nam Can
++ Day 6 (20th. March 2020) 
+    - Morning: Interviews with households @ Hiep Tung, Ham ROng, Hang Vinh, and Dat Moi commune
+    - Afternoon: Interviews with households (Continued)
+    - Accommodation: Nam Can
++ Day 7 (21th. March 2020) 
+    - Morning: Interviews with households @ Lam Hai, Nam Can, Tan An Tay commune
+    - Afternoon: Interviews with households (Continued)
+    - Accommodation: Nam Can
++ Day 8 (22th. March 2020) 
+    - Morning: survey (if necessary)
+    - Afternoon: Move back from Ca Mau to Can Tho
+    - Accommodation: Can Tho
+
+# Appendices
++ Ca Mau province map
++ Target commune / district map
++ Commune map
+
