@@ -23,6 +23,21 @@ library(GGally)
 library(tidyverse)
 library(viridis)
 library(viridisLite)
+# #
+# ## --- END ---
+
+# # WARNING
+# # THIS PROCESS NEEDS COMPUTATION PERIOD.
+# # COMMENT OUT WHEN NOT IN USE.
+# # Make maps to detect farmers' / fishermen's using areas
+# # By having them draw an area (circle, rectangle), we are able to 
+# # obtain exact information on their land use.
+# # read Google API
+# # change the API code as you obtain from Google
+# ---- area.map ----
+source("../../r_project/map.key.r")
+# #
+# ## --- END ---
 
 # ---- read.data ----
 # To download sf file, please refer to the following website.
@@ -870,20 +885,7 @@ hh.2010.selected <-
 # 
 # #
 # ## --- END ---
-
-
-
-# # WARNING
-# # THIS PROCESS NEEDS COMPUTATION PERIOD.
-# # COMMENT OUT WHEN NOT IN USE.
-# # Make maps to detect farmers' / fishermen's using areas
-# # By having them draw an area (circle, rectangle), we are able to 
-# # obtain exact information on their land use.
-# # read Google API
-# # change the API code as you obtain from Google
-# ---- area.map ----
-source("../../r_project/map.key.r")
-
+#
 # # set common arguments
 # # When we adjust settings of the map, adjust the following argument.
 # # ---- set.common.arguments ----
@@ -1169,7 +1171,7 @@ communes.target <-
   bind_rows(communes.observed.2010, 
             communes.to.be.observed
             ) %>% 
-  mutate(additional.observation = 8-check.status) %>% 
+  mutate(additional.observation = 5-check.status) %>% 
   mutate_at(vars(additional.observation), 
             funs(ifelse(additional.observation<0,
                         0,
