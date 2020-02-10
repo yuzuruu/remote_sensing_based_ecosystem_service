@@ -1,5 +1,5 @@
 ---
-title: "Survey protocol camau March 2020"
+title: "Protocol for Ca Mau ecosystem survey March 2020"
 author: "Yuzuru Utsunomiya"
 date: "`r Sys.time()`"
 output:
@@ -44,14 +44,14 @@ knitr::read_chunk("remote_sensing_based_ecosystem_service.R")
 
 # Introduction
 ## Purpose of this survey
-To estimate ecosystem service derived from mangrove, we will conduct structured interviews with households located in Ca Mau, especially focusing on drivers of ecosystem service. 
+To estimate ecosystem service derived from mangrove, we will conduct structured interviews with households located in Ca Mau, especially focusing on drivers of ecosystem service movement. 
 
 This research provides us the followings: First, we are able to estimate accurate ecosystem service while combining socioeconomic situation and land use from satellite imagery. second, we are able to discuss on the ecosystem service based on panel data.
 
 ## Target
-Our targets are households living in 24 communes, Ca Mau province. In 2010, a survey has been done in this region. Mangrove forests surrounding there is in danger of extinction. In terms of conservation of the mangrove and establishment of sustainable economy, understanding there is vital issue.
+Our targets are households living in 24 communes, Ca Mau province. In 2010, a survey has been done in this region. After a decade, mangrove forests surrounding there is in danger of extinction. In terms of conservation of the mangrove and establishment of sustainable economy, understanding the ecosystem service derived from the mangrove is vital issue.
 
-For 120 households located in 24 communes of Ca Mau province, we would like to perform the survey. Using Google Maps, we checked current situations of target household in 2010. Some of them have been disappeared and others still remains. Because of development such as shrimp pond, forestation, and others, they have been forced to move.
+For 120 households located in 24 communes of Ca Mau province, we would like to perform the survey. Before selecting sampling area, using Google Maps, we checked current situations of target household in 2010. Some of them have been disappeared and others still remains. Because of development such as opening shrimp pond, forestation, and others, they might have been forced to move.
 
 The map below shows location of visited households in 2010. There are 65 points in total. There are points more than 10 in some communes and is no points in other communes. This time, to cover the skipped communes, we expand survey target to the communes as well as visited communes.
 
@@ -61,7 +61,7 @@ plot(map.sat.cm.target.district.commune)
 
 Targets are classified into 3 groups as follows:
 
-+ 53 households in 15 communes: The households in the communes have experienced survey in 2020. The households will be expected to "panel" data. This group includes the following communes; Dat Moi, Ham Rong, Hang Vinh, Hiep Tung, Lam Hai, Dat Mui, Rach Goc, Tan An Tay, Vien An Dong, Cai Doi Vam, Phu Tan, Rach Cheo, Tan Hung Tay, Viet Khai, and Viet Thang.
++ 53 households in the visited 15 communes: The households in the communes have experienced survey in 2020. The households will be expected to become a part of "panel" data. This group includes the following communes; Dat Moi, Ham Rong, Hang Vinh, Hiep Tung, Lam Hai, Dat Mui, Rach Goc, Tan An Tay, Vien An Dong, Cai Doi Vam, Phu Tan, Rach Cheo, Tan Hung Tay, Viet Khai, and Viet Thang.
 + 22 in the 15 communes: In some communes of 15 communes above, the N. of household is insufficient. For smooth analysis, we need to add samples more. N. of additional samples differs depending on commune. 
 + 45 households in 9 communes: Households in the communes have NOT experienced survey in 2020. The communes includes followings; Nam Can, Tam Giang, Tam Giang Dong, Tam Giang Tay, Tan An, Vien An, Phu My, Phu Thuan, and Tan Hai commune.
 
@@ -84,7 +84,7 @@ $$
 
 where $y_{ijt}$ is income of household $i$ located at a village $j$ in year $t$; $\alpha$ denotes an intercept of this model; $\sum_{i=1}^{n}\beta_{i}x_{i}$ denotes a set of predictors; and $\rho\sum_{j=1}^{n}Wy_{jk}$ denotes a set of spatial effect.
 
-The predictors includes the following factors: 
+The predictors what we expect includes the following factors: 
 
 + education level of household's 
 + midset: We will obtain this item as a result of questionnaire while using k-means clustering.
@@ -94,25 +94,8 @@ The predictors includes the following factors:
 + production volume
 
 # Procedure
-## Transportation and accommodation
-On 16th. March, we will move from Can Tho to Ca Mau with a van. 
 
-## Survey group
-We will separate ourselves into some groups. For each group, we will rent a motorcycle.
-
-+ Group 1: Prof. Tuan and Yuzuru
-+ Group 2: 2 students
-+ Group 3: 2 students
-+ Group 4: 2 students
-
-## Data collection
-In accordance with the questionnaire, we will conduct interview surveys. For the interview, if possible, it is better to finish within 1 hour per household.
-
-At the same time, we will ask householder to circle their lands. Using the results, we will specify the area, pick that up from satellite imagery, compute NDVI, and analyse. 
-
-In each of day, Yuzuru will collect survey sheets and input the results.
-
-## tentative Schedule
+## Tentative Schedule
 + Day 1 (15th. March 2020)
     - Morning: Meeting on the survey
     - Afternoon: Move from Can Tho to Ca mau
@@ -146,8 +129,19 @@ In each of day, Yuzuru will collect survey sheets and input the results.
     - Afternoon: Move back from Ca Mau to Can Tho
     - Accommodation: Can Tho
 
-# Appendices
-+ Ca Mau province map
-+ Target commune / district map
-+ Commune map
+## Survey group
+We will separate ourselves into some groups. For each group, we will rent a motorcycle.
+
++ Group 1: Prof. Tuan and Yuzuru
++ Group 2: 2 students
++ Group 3: 2 students
++ Group 4: 2 students
+
+## Data collection
+In accordance with the questionnaire, we will conduct interview surveys. For the interview, if possible, it is better to finish within 1 hour per household.
+
+At the same time, we will ask householder to circle their lands. Using the results, we will specify the area, pick that up from satellite imagery, compute NDVI, and analyse. 
+
+In each of day, Yuzuru will collect survey sheets and input the results.
+
 
